@@ -1,0 +1,1560 @@
+                                            Beyond Correlation: Interpretable Evaluation of Machine Translation
+                                                                          Metrics
+
+                                                            Stefano Perrella* Lorenzo Proietti* Pere-Lluís Huguet Cabot
+                                                                           Edoardo Barba Roberto Navigli
+                                                                    Sapienza NLP Group, Sapienza University of Rome
+                                                                {perrella, lproietti, huguetcabot, barba, navigli}@diag.uniroma1.it
+
+
+
+
+                                                                      Abstract
+                                                                                                                          -1.49
+                                                Machine Translation (MT) evaluation metrics
+                                                assess translation quality automatically. Re-                                                   Mistranslation
+
+
+
+
+arXiv:2410.05183v1 [cs.CL] 7 Oct 2024
+                                                cently, researchers have employed MT metrics                                                   Severity: Critical
+                                                for various new use cases, such as data filtering
+                                                and translation re-ranking. However, most MT                 0.86                              Score        -25
+                                                metrics return assessments as scalar scores that
+                                                are difficult to interpret, posing a challenge to
+                                                making informed design choices. Moreover,                  SRC                  MT                        REF
+
+                                                MT metrics’ capabilities have historically been        这清晰得就像伦         This is clear like a     This is as clear as a
+                                                evaluated using correlation with human judg-           敦的雾天一样          day of fog in London.    foggy day in London.
+
+                                                ment, which, despite its efficacy, falls short of
+                                                providing intuitive insights into metric perfor-     Figure 1: Quality assessments returned by COMET (Rei
+                                                mance, especially in terms of new metric use         et al., 2020), MetricX-23-QE-XL (Juraska et al., 2023),
+                                                cases. To address these issues, we introduce an      and GEMBA - MQM (Kocmi and Federmann, 2023) for
+                                                interpretable evaluation framework for MT met-       the provided machine-translated text.
+                                                rics. Within this framework, we evaluate met-
+                                                rics in two scenarios that serve as proxies for
+                                                the data filtering and translation re-ranking use    references by comparing translations only to their
+                                                cases. Furthermore, by measuring the perfor-         sources in the original language. Lately, reference-
+                                                mance of MT metrics using Precision, Recall,         free metrics have demonstrated performance on par
+                                                and F -score, we offer clearer insights into their   with, and sometimes superior to, their reference-
+                                                capabilities than correlation with human judg-
+                                                                                                     based counterparts (Freitag et al., 2023; Kocmi
+                                                ments. Finally, we raise concerns regarding the
+                                                reliability of manually curated data following
+                                                                                                     et al., 2024a). Thanks to these advancements and
+                                                the Direct Assessments+Scalar Quality Met-           the ability to use metrics without references, sev-
+                                                rics (DA+SQM) guidelines, reporting a notably        eral new MT metrics use cases have emerged. Fre-
+                                                low agreement with Multidimensional Quality          itag et al. (2022a), Fernandes et al. (2022), Farin-
+                                                Metrics (MQM) annotations.                           has et al. (2023), Ramos et al. (2024), and Finkel-
+                                                                                                     stein and Freitag (2024) used MT metrics as utility
+                                                                                                     functions for Minimum Bayes Risk (MBR) decod-
+                                        1       Introduction
+                                                                                                     ing (Kumar and Byrne, 2004; Eikema and Aziz,
+                                        Over the past few years, Machine Translation (MT)            2020) and for Quality Estimation (QE) re-ranking.1
+                                        evaluation metrics have transitioned from heuristic-         Ramos et al. (2024), Gulcehre et al. (2023), He
+                                        based to neural-based, enabling a more nuanced               et al. (2024), and Xu et al. (2024) used MT metrics
+                                        evaluation of translation quality and a greater agree-       as a proxy for human preferences to fine-tune MT
+                                        ment with human judgments (Freitag et al., 2022b).           systems using Reinforcement Learning (RL)- and
+                                        Additionally, recent Metrics Shared Tasks at the             Direct Preference Optimization (DPO)-like train-
+                                        Conference on Machine Translation (Mathur et al.,            ing objectives. Peter et al. (2023), Alves et al.
+                                        2020b; Freitag et al., 2021b, WMT) have seen the                 1
+                                                                                                           MBR decoding and QE re-ranking are methods used to
+                                        rise of reference-free metrics, which assess trans-          identify the best translation from multiple outputs generated
+                                        lation quality without the need for human-curated            by an MT system for the same source text. MBR decoding typ-
+                                                                                                     ically relies on reference-based metrics, while QE re-ranking
+                                            *
+                                                Equal contribution.                                  depends on reference-free metrics.
+(2024), and Gulcehre et al. (2023) used reference-         scores, which are difficult to interpret. Therefore,
+free metrics to filter parallel corpora – discarding       we are interested in understanding the meaning of
+all translations assigned with a metric score that is      these scores, rather than the internal workings of
+below a certain threshold – with the goal of train-        MT metrics.
+ing MT systems using higher quality data. These               In light of this, we attribute MT metrics assess-
+works leverage MT metrics for applications beyond          ments’ lack of interpretability to three main fac-
+their traditional use of measuring incremental im-         tors:2
+provements in the development of MT systems.
+However, the lack of a dedicated evaluation, paired          1. Range consistency: it is unclear whether a
+with the inherent opacity of MT metrics, makes it               difference in metric score has the same mean-
+challenging to determine whether one metric suits               ing if it occurs in different regions of the score
+a given task better and what the impact of various              range.
+design choices is. For example, Alves et al. (2024),
+Peter et al. (2023), and Gulcehre et al. (2023) fil-         2. Error attribution: scalar quality assessments
+ter MT datasets using different MT metrics and                  do not identify specific translation errors.
+thresholds, leaving it unclear whether an optimal
+choice exists. Furthermore, considering the ever-            3. Performance: metrics capabilities are typi-
+increasing number of metrics available, researchers             cally measured through correlation with hu-
+are often limited to grid-searching for the best con-           man judgment, which fails to provide users
+figuration for each new application, as do Fernan-              with a clear understanding of their perfor-
+des et al. (2022) and Ramos et al. (2024), who                  mance and reliability.
+explore by grid-search whether certain metrics are
+better suited than others for MBR decoding, QE             In simpler terms, let us consider the example of
+re-ranking, and as reward models for RL-based              Figure 1. Due to the lack of Error attribution we
+training. However, the lack of dedicated evalua-           do not know which translation errors, if any, led
+tion setups often requires revisiting these studies        COMET (Rei et al., 2020) to return 0.86. Also, the
+to assess whether their findings hold with newer           metric comes with no Range consistency guarantee,
+metrics, resulting in a non-negligible increase in         e.g. whether 0.86 is twice as good as 0.43. Further-
+experimentation time.                                      more, different metrics have different score ranges,
+   In this work, we address these issues by intro-         making it difficult to compare the assessments from
+ducing a novel and more interpretable evaluation           COMET with those of the other MT metrics in the
+
+framework for MT metrics, comprising evaluation            figure. Finally, lacking a clear understanding of
+setups designed as proxies for new metric use cases.       COMET ’s Performance beyond human correlation,
+
+In the following sections, we first illustrate the prob-   we cannot be sure whether we can draw conclu-
+lem of interpretability, then introduce our frame-         sions from its assessments safely.
+work, and finally present our results.                        For this reason, some efforts have been made to
+                                                           design interpretable metrics. For example, among
+2   The Interpretability of MT Metrics’                    the primary submissions to the WMT23 Metrics
+    Assessments                                            Shared Task (Freitag et al., 2023), MaTESe (Per-
+                                                           rella et al., 2022) annotates the spans of a transla-
+In the field of AI, Interpretability is defined as “the    tion that contain errors, specifying their severity,
+ability to explain or to provide the meaning in un-        xCOMET models (Guerreiro et al., 2024) return an-
+derstandable terms to a human” (Barredo Arrieta            notated error spans together with a final regression
+et al., 2020), and typically refers to the problem         value, and GEMBA - MQM (Kocmi and Federmann,
+of understanding the decision-making process of            2023) leverages GPT-4 (OpenAI et al., 2024) to
+an AI model. However, our goal here is less ambi-          produce detailed quality assessments. However,
+tious. Instead of focusing on the interpretability of      these metrics compromise on other aspects to ac-
+MT metrics themselves, we are concerned with the           commodate the increased interpretability. MaTESe
+interpretability of their assessments. Specifically,       displays a lower correlation with human judgment
+most state-of-the-art MT metrics are trained to min-          2
+                                                                We wish to clarify that we identified these three factors
+imize the Mean Squared Error (MSE) with human              as notably impactful, but they are non-exhaustive and may
+judgments and return assessments as scalar quality         overlap.
+than several regression-based metrics.3 Trading off             best translation in a group of translations of the
+performance and interpretability, xCOMET models’                same source (acting as a proxy for translation re-
+final assessment is based mainly on the regression              ranking).
+component, with annotated spans contributing only
+2/9 of the overall score. Finally, GEMBA - MQM is               3.1   Metrics as Binary Classifiers for Data
+prohibitively expensive to operate and its assess-                    Filtering
+ments are not fully-reproducible, due to its depen-             Let us consider the MT metric M, which out-
+dence on the closed-source GPT-4.                               puts scores in the range [m1 , m2 ]. Let us define
+   In this work, we seek to mitigate the inter-                 M(t) ∈ [m1 , m2 ] as the score assigned by metric
+pretability issue by targeting the problem of Per-              M to translation t. By selecting an arbitrary thresh-
+formance. Specifically, we take inspiration from                old value τ ∈ [m1 , m2 ], we repurpose M as a bi-
+two popular new MT metrics applications, i.e.,                  nary classifier: a translation t is deemed as G OOD
+data filtering and translation re-ranking, in order to          by metric M, with threshold τ , if M(t) ≥ τ , oth-
+study and measure metrics performance in terms                  erwise it is deemed as BAD .
+of Precision, Recall, and F -score. Taking ad-
+                                                                Precision, Recall, and F -score Assuming that
+vantage of these measures that are more transpar-
+                                                                we have an oracle H telling us whether a trans-
+ent than correlation, we aim to shed light on the
+                                                                lation is G OOD or BAD , we can measure the
+meaning and reliability of metrics assessments,
+                                                                performance of metric M, with threshold τ , in
+especially concerning such new MT metrics use
+                                                                terms of standard measures such as Precision, Re-
+cases. We release our evaluation framework as
+                                                                call, and F -score, which we refer to as P Mτ , RMτ ,
+software at https://github.com/SapienzaNLP/
+                                                                and F Mτ . Given metric M, oracle H, translation
+interpretable-mt-metrics-eval.
+                                                                t, and threshold τ , P Mτ estimates the probability
+3   An Interpretable Evaluation                                 that translation t is G OOD , given that metric M
+    Framework for MT Metrics                                    deems it as such:
+
+Two popular new MT metrics applications are data                  P Mτ = P̂r(H(t) = G OOD | M(t) ≥ τ ). (1)
+filtering and translation re-ranking. In data filter-
+ing, MT metrics separate good-quality from poor-                Similarly, RMτ estimates the probability that met-
+quality translations. After choosing a threshold                ric M deems translation t as G OOD , given that
+value, all translations below the threshold are la-             the oracle deems it as such:
+beled as poor quality and discarded. In this re-
+spect, we are interested in jointly assessing metric              RMτ = P̂r(M(t) ≥ τ | H(t) = G OOD ). (2)
+performance and studying the meaning of metric
+scores, finding the thresholds that best separate               Finally, we aggregate Precision and Recall using
+good-quality ( G OOD ) from poor-quality ( BAD )                Fβ -score, with β = √12 , which weights Precision
+translations. Instead, in translation re-ranking, MT            higher than Recall compared to the more common
+metrics determine the best in a pool of translations            F1 -score. Arguably, false positives – i.e., trans-
+of the same source text. For example, in QE re-                 lations of low quality that are mistakenly consid-
+ranking and MBR decoding, metrics are tasked to                 ered G OOD – could be detrimental to the applica-
+identify the best translation among those sampled               tions that see metrics employed as binary classifiers.
+from an MT system.                                              For example, in data filtering, false positives corre-
+    With the aim of facilitating practitioners in mak-          spond to low-quality translations that survive the
+ing design choices for these metrics applications,              filtering, compromising the quality of filtered data.
+and with a focus on the interpretability issue, we              In contrast, false negatives – i.e., translations of
+evaluate MT metrics performance in two settings: i)             high quality that are mistakenly assigned with the
+when metrics are used as binary classifiers, tasked              BAD label – would more frequently lead to minor
+to separate between G OOD and BAD translations                  inconveniences, as they correspond to good-quality
+(acting as a proxy for the data filtering applica-              translations that are mistakenly discarded. More-
+tion), and ii) when metrics are used to identify the            over, we note that MT metrics struggle to achieve
+   3
+                                                                high Precision, meaning that metrics differences
+     While this might be due to several contributing factors,
+the limited availability of training data containing detailed   can be best highlighted if Precision is weighted
+span-level annotations is most likely one of them.              higher than Recall.
+  Therefore, the F -score of metric M, with thresh-            We conduct the evaluation using WMT23MQM ,
+old τ , is defined as follows:                              specifically the ZH→EN language direction, and
+                                                            use WMT23DA+SQM as a reference for human per-
+                       3 P Mτ R Mτ                          formance, given that it contains a subset of the
+            F Mτ =                     .             (3)
+                       2 12 P Mτ + RMτ                      translations in WMT23MQM annotated using a dif-
+                                                            ferent human evaluation scheme. Results concern-
+3.2    Metrics as Utility Functions for                     ing the other language directions in WMT23MQM ,
+       Translation Re-Ranking                               i.e., EN→DE and HE→EN, are reported in the Ap-
+Let us consider the set T = {t1 , t2 , ..., tn } contain-   pendix.
+ing translations of the same source text. We are
+interested in assessing metric performance in rank-         4.2   The Metrics
+ing the best translation, as determined by human            We consider the following metrics: COMET,
+annotators, in the first position. However, metrics         COMET- QE, and COMET- QE - MQM (Rei et al., 2020,
+and humans might return tied assessments, plac-             2021); BLEURT-20 (Sellam et al., 2020; Pu et al.,
+ing two or more translations together in the first          2021); MetricX-23, MetricX-23-QE, MetricX-23-
+position. Therefore, we define T M as the subset            XL, and MetricX-23-QE-XL (Juraska et al., 2023);
+of T containing all translations assigned with the          CometKiwi and CometKiwi-XL (Rei et al., 2022,
+highest score by M. Similarly, T H contains the             2023a); xCOMET- ENSEMBLE and xCOMET- QE -
+translations of T ranked highest by human anno-             ENSEMBLE (Guerreiro et al., 2024); x COMET- XL
+tators. The Re-Ranking Precision of metric M is             (Guerreiro et al., 2024); MaTESe and MaTESe-
+defined as follows:                                         QE (Perrella et al., 2022); GEMBA - MQM (Kocmi
+                                                            and Federmann, 2023); MBR-MetricX-QE (Naskar
+                           |T M ∩ T H |
+              RRP M =                   .            (4)    et al., 2023). We refer the reader to Appendix C
+                              |T M |                        for detailed information regarding these metrics,
+                                                            where we also provide a broader selection, includ-
+   Unlike in the data filtering scenario, we focus
+                                                            ing lexical-based and sentinel metrics (Perrella
+solely on Re-Ranking Precision, not Recall. This
+                                                            et al., 2024).
+is because, to serve as a proxy for translation re-
+ranking applications, what matters is whether the              Additionally, following Freitag et al. (2023), we
+returned translation is the best – or among the best        include the results from a random baseline, i.e.,
+– rather than identifying all the translations ranked       Random-sysname, which outputs discrete scores
+highest by human annotators.                                drawn from several Gaussian distributions, one for
+                                                            each MT system that translated the texts in the test
+4     Experimental Setup                                    set. Each Gaussian has a randomly assigned mean
+                                                            between 0 and 9, with a standard deviation of 2.
+This section outlines the data employed, the metrics
+evaluated, and our methodology. Implementation              4.3   Selecting the Thresholds τ
+details regarding the calculation of Precision, Re-         In the data filtering scenario, we can measure two
+call, and F -score are in Appendix A.                       different aspects of metric performance, depending
+                                                            on how we select the τ value:
+4.1    The Data
+We employ WMT23MQM (Freitag et al., 2023),                    1. By selecting τ to maximize the F -score on
+which contains human annotations collected within                the test set, we measure MT metrics’ abil-
+the Multidimensional Quality Metrics framework                   ity to separate G OOD from BAD transla-
+(Lommel et al., 2014, MQM), and WMT23DA+SQM                      tions under ideal conditions. This scenario
+(Kocmi et al., 2023), which includes human annota-               allows us to measure the maximum achiev-
+tions as Direct Assessments + Scalar Quality Met-                able F -score for each metric on the test data,
+rics (Kocmi et al., 2022, DA+SQM). Both datasets                 effectively evaluating the metric’s discrimina-
+consist of source texts translated by multiple MT                tive power. Metrics whose assessments are
+systems, with translation quality assessed by pro-               not accurate enough, noisy, or, more gener-
+fessional human annotators. Table 4 in the Ap-                   ally, poorly aligned with human judgments,
+pendix provides additional information regarding                 will achieve a lower optimal F -score than the
+these datasets.                                                  others.
+    2. By selecting τ to maximize the F -score on a              5.1   Binary Classification
+       development set, we estimate the true values              Table 1 shows MT metrics’ threshold values, Preci-
+       of MT metrics’ Precision, Recall, and F -score            sion, Recall, and F -score in distinguishing G OOD
+       in data filtering applications.                           from BAD and P ERFECT from OTHER transla-
+We measure metric performance in both evalua-                    tions, with the optimal threshold τ selected on the
+tion scenarios. As a development set, we use                     test set. As can be seen, most MT metrics perform
+WMT22MQM , which contains MQM-based hu-                          reasonably well in distinguishing between G OOD
+man annotations (Freitag et al., 2022b). However,                and BAD translations, achieving optimal F -scores
+since some of the tested metrics were trained using              as high as 81.59 and 81.40, from GEMBA - MQM
+WMT22MQM data, we restrict this experiment to                    and xCOMET- QE - ENSEMBLE, respectively, and as
+the other metrics.                                               low as 75.81, from BLEURT-20. Instead, lower
+                                                                 performance is observed when differentiating be-
+4.4      Extracting Binary Labels from                           tween P ERFECT and OTHER translations, with
+         Manually-Annotated Datasets                             the highest F -score being 68.47, from xCOMET-
+Within the MQM annotation framework, profes-                     ENSEMBLE . We also note that Precision is al-
+sional annotators identify span-level translation er-            most always lower than Recall, despite the optimal
+rors and assign each error a category and severity.              threshold τ being selected to maximize Fβ -score
+The final MQM score is calculated based on these                 with β = √12 , which gives more weight to Preci-
+errors using the following weighting scheme (Fre-                sion over Recall. These results suggest that the
+itag et al., 2021a):                                             metrics may lack the sensitivity required to distin-
+          Error severity   Category          Penalty
+                                                                 guish between high-quality translations that differ
+                                                                 in minor nuances rather than major errors. As a
+                           Non-translation     −25
+          Major                                                  result, they may resort to lower thresholds, com-
+                           Others               −5
+                           Punctuation         −0.1              pensating for their lack of Precision with a higher
+          Minor                                                  Recall.
+                           Others               −1
+   We map the annotations in WMT23MQM and                           Table 2 reports threshold values, Precision, Re-
+WMT22MQM to binary labels by considering trans-                  call, and F -score when the threshold is optimized
+lations with a score above a certain threshold as                on the development set. Note that we restrict the
+ G OOD . Specifically, if a translation is assigned              set of tested metrics to those that are openly avail-
+an MQM score h, we label it as G OOD if h ≥ −4,                  able and do not employ the WMT22MQM data for
+meaning it contains no Major errors and at most 4                training. As expected, the F -score values are lower
+Minor ones (or more if Minor punctuation errors                  than the optimal ones reported in Table 1. Nonethe-
+are present). Additionally, we classify translations             less, the metric rankings remain stable across the
+as P ERFECT if they contain at most 1 Minor er-                  two settings, with MetricX-23-XL and MetricX-23-
+ror, i.e., those with h ≥ −1.4 This allows us to                 QE-XL outperforming the other metrics among the
+investigate metrics’ ability to distinguish between              reference-based and reference-free ones, respec-
+ P ERFECT and OTHER translations.                                tively.
+                                                                    In general, it is worth noting that the best-
+5       Results                                                  performing openly available, reference-free met-
+                                                                 ric is MetricX-23-QE-XL. This result is consistent
+In this section, we report the performance obtained              across language pairs (Appendix D). Therefore, we
+by MT metrics when used as binary classifiers to                 recommend using MetricX-23-QE-XL for data fil-
+distinguish between G OOD and BAD , as well as                   tering applications.
+ P ERFECT and OTHER translations, and in terms
+of their effectiveness in translation re-ranking, i.e.,          Thresholds reliability Our results show that op-
+in selecting the best translations among candidates              timal thresholds tend to vary when moving from
+for the same source text.                                        WMT23MQM to WMT22MQM for their calcula-
+    4
+     We use h ≥ −1 and not h = 0 because the inter-              tion. For example, MetricX-23-QE-XL’s τ shifts
+annotator agreement in MT evaluation is not particularly high    from −3.57 to −5.45, and from −1.64 to −3.54,
+(Freitag et al., 2021a), even with high-cost annotation frame-   when separating between G OOD and BAD and
+works like MQM. Therefore, we argue that selecting only
+translations with a score of 0 might overly depend on individ-    P ERFECT and OTHER , respectively, and other
+ual annotators’ preferences.                                     metrics display a similar pattern. Optimal threshold
+                                             G OOD vs BAD                   P ERFECT vs OTHER             Re-ranking
+             Metric                   τ        P       R       F        τ        P        R       F      RRP      Avg.
+             xCOMET- ENSEMBLE         0.83   79.91    84.42   81.36     0.91   68.25    68.93   68.47    43.17    −2.38
+             xCOMET- XL               0.80   78.33    83.63   80.02     0.92   67.55    67.46   67.52    37.49    −2.75
+ REFERENCE   MetricX-23              −4.79   77.43    86.23   80.15    −2.25   63.99    73.20   66.79    39.63    −2.72
+             MetricX-23-XL           −3.52   77.80    84.46   79.90    −1.74   65.60    72.54   67.76    39.52    −2.71
+   BASED     MaTESe                  −4.00   76.53    78.10   77.05    −1.00   55.75    79.88   61.99    33.07    −3.18
+             COMET                    0.76   74.56    78.76   75.91     0.82   61.25    64.38   62.26    34.25    −3.06
+             BLEURT-20                0.60   72.76    82.76   75.81     0.67   55.88    69.21   59.71    33.35    −3.07
+             xCOMET- QE - ENSEMBLE    0.83   80.40    83.47   81.40     0.92   70.00    63.60   67.73    41.40    −2.47
+             MBR-MetricX-QE           0.73   79.00    82.81   80.23     0.80   67.02    65.91   66.64    38.47    −2.40
+             MetricX-23-QE           −3.90   76.73    87.70   80.07    −1.31   67.76    67.85   67.79    37.55    −2.59
+ REFERENCE   MetricX-23-QE-XL        −3.57   77.91    83.36   79.64    −1.64   67.15    70.08   68.10    36.09    −2.83
+             GEMBA - MQM             −5.00   82.41    79.99   81.59    −1.00   64.12    74.12   67.14    42.58    −2.30
+    FREE     MaTESe-QE               −4.00   73.72    85.64   77.30     0.00   55.43    75.05   60.72    30.34    −3.59
+             COMET- QE               −0.01   75.35    82.53   77.60     0.05   59.64    68.59   62.35    37.35    −2.66
+             COMET- QE - MQM          0.08   75.40    86.33   78.72     0.10   61.63    73.84   65.22    33.52    −3.59
+             CometKiwi                0.76   78.62    80.90   79.37     0.80   64.79    66.52   65.35    39.28    −2.61
+             CometKiwi-XL             0.64   78.04    79.81   78.62     0.71   64.73    65.51   64.99    38.78    −2.60
+             Random-sysname          −5.00   64.06   100.00   72.78    −4.00   42.14    99.99   52.21    29.04    −3.74
+             DA+SQM                  63.50   67.83    95.95   75.18    74.67   48.30    82.61   56.06    32.99    −3.22
+
+Table 1: Metrics’ Precision, Recall, and F -score in binary classification, distinguishing G OOD from BAD ,
+and P ERFECT from OTHER translations. τ is selected to maximize the F -score on the test set. In the last
+two columns, we report metrics’ Precision in translation re-ranking and the average MQM score of the selected
+translations. The test set is WMT23MQM and the translation direction is ZH→EN. We report results concerning other
+translation directions in Appendix D. The metrics highlighted in grey are not openly available.5
+
+
+values do not appear stable across language pairs             employed to translate the source texts, the data
+either, as illustrated in Figures 3 and 4 in the Ap-          domains included, and the human annotators who
+pendix. Specifically, optimal thresholds frequently           assessed translation quality. Therefore, while leav-
+differ between EN→DE and the other translation di-            ing the investigation of these phenomena to future
+rections in the G OOD vs BAD scenario, and are                work, we recommend estimating optimal thresh-
+substantially lower for HE→EN in the P ERFECT                 olds using as much annotated data as possible, to
+vs OTHER scenario. Such differences in the op-                prevent the peculiarities of any single dataset from
+timal thresholds might suggest that metric scores             overly influencing the estimated values. To sup-
+have different meanings depending on the trans-               port this, we are releasing our evaluation frame-
+lation direction. Furthermore, and as already dis-            work with options for estimating optimal metric
+cussed, an overly small optimal threshold might               thresholds across several datasets, depending on
+suggest that metrics are not precise enough. How-             the user’s Precision and Recall requirements.
+ever, threshold values might also be influenced by
+the quality of the translations in the dataset. Indeed,       5.1.1    What is the human performance?
+on average, the HE→EN dataset contains higher-                As a reference for human performance, we exam-
+quality translations compared to the other language           ine the agreement between two annotation schemas:
+pairs (Table 5 in the Appendix). This might incen-                 5
+                                                                Due to its dependence on GPT-4, we include GEMBA -
+tivize the metrics to “settle” for lower threshold            MQM in the group of not openly available metrics. Instead,
+values in order to maximize Recall.                           openly-available versions of MetricX-23 and MetricX-23-QE
+                                                              can be found at https://github.com/google-research/
+   In general, we believe that the characteristics of         metricx. However, we could not compute their predictions
+the development set play an important role in de-             due to their high parameter count and thus resorted to us-
+termining appropriate thresholds for data filtering           ing their outputs as submitted to WMT23, which were com-
+                                                              puted using different checkpoints than those currently avail-
+applications. Aside from the translation direction,           able. Therefore, we include MetricX-23 and MetricX-23-QE
+evaluation datasets can differ in the MT systems              in the group of not openly available metrics as well.
+                                                     G OOD vs BAD                      P ERFECT vs OTHER
+                          Metric              τ        P        R         F        τ        P      R       F
+
+              REFERENCE
+                          MetricX-23-XL      −3.93    76.58    87.01    79.77    −2.97    57.70   88.80   65.32
+                          COMET               0.77    75.95    75.28    75.72     0.79    55.51   74.57   60.68
+                BASED     BLEURT-20           0.61    73.81    79.92    75.74     0.64    52.45   76.89   58.67
+                          MetricX-23-QE-XL   −5.45    73.36    91.88    78.64    −3.54    55.63   90.32   63.80
+              REFERENCE   COMET- QE - MQM     0.07    72.57    92.41    78.17     0.08    52.59   93.19   61.53
+                          COMET- QE          −0.02    73.77    85.81    77.39    −0.02    50.54   88.44   58.96
+                 FREE
+                          CometKiwi           0.74    75.57    85.35    78.58     0.76    53.38   86.73   61.23
+                          CometKiwi-XL        0.62    75.47    83.37    77.93     0.64    53.70   85.03   61.22
+
+Table 2: Metrics’ Precision, Recall, and F -score in binary classification, distinguish G OOD from BAD , and
+ P ERFECT from OTHER translations. τ is selected to maximize the F -score on the development set. The test set
+is WMT23MQM and the translation direction is ZH→EN. Results in other translation directions are in Appendix D.
+
+
+DA+SQM and MQM. We use DA+SQM as a met-                           with these findings, our results raise additional con-
+ric and show the results in the last row of Table 1. It           cerns regarding DA+SQM reliability, showing per-
+is important to note that DA+SQM annotations do                   formance inferior to automatic metrics.
+not fully encompass the set of MQM annotations.
+Consequently, we evaluate its performance on a                    5.1.2       How BAD are false positives?
+subset of the data, including ≈ 70% of the data                  Our analysis suggests that MT metrics struggle
+used for metrics, which means that their scores                  to achieve high precision in binary classification.
+are not directly comparable. However, we observe                 Concerning this, we are interested in assessing how
+that DA+SQM performs poorly in absolute terms,                   bad the false positives are – i.e., translations that
+with particularly low Precision and a much higher                metrics mislabel as G OOD or P ERFECT . To this
+Recall. We hypothesize that this might be due                    end, we plot in Figure 2 the distributions of the
+to DA+SQM’s annotation guidelines, which in-                     MQM score ∆ computed for a false positive as the
+struct annotators to assign only a general quality               difference between the MQM score and the human
+score to translations rather than identifying spe-               threshold, which is −4 for a G OOD translation
+cific translation errors, as is done within the MQM              and −1 for a P ERFECT one.
+framework.6 This might lead to noisy annotations,                   The average false positive ∆ ranges from −4.25
+rendering DA+SQM less suitable for fine-grained                  to −2.85 for both G OOD and P ERFECT clas-
+translation quality assessments.                                 sifications, indicating that the translations misla-
+   We further investigate this in Appendix F by re-              beled by the best metrics contain an average of
+stricting the data available to MT metrics to that               ≈ 3 additional Minor errors. Overall, the MQM
+of DA+SQM, to estimate their segment-level cor-                  ∆ distributions of top-performing metrics are low-
+relations with MQM scores. We find DA+SQM                        variance and skewed to the right, particularly when
+annotations correlate less strongly with MQM com-                classifying P ERFECT translations. In contrast,
+pared to all tested automatic metrics. We wish to                less accurate metrics exhibit high-variance distri-
+emphasize that Kocmi et al. (2023) have already                  butions, with the average ∆ shifting towards lower
+noted that DA+SQM-based annotations exhibit re-                  values. Again, DA+SQM performance is notably
+duced precision in distinguishing between MT sys-                poor, showing the highest-variance distribution and
+tems with similar performance, compared to MQM-                  the most leftward-shifted average.
+based annotations. Furthermore, in a recent study,
+Kocmi et al. (2024b) compared the correlation of                  5.2     Translation Re-Ranking
+several human annotation schemes with MQM and                    We present the results in the last two columns of
+found that DA+SQM performed poorly. In line                      Table 1. To facilitate interpretation of these results,
+                                                                 we also calculate the average MQM score of the
+   6
+     Within DA+SQM, human annotators rate a translation          translations ranked highest by MT metrics, and
+from 0 to 100 using a slider with 7 marked levels, where
+each level is paired with a description of the corresponding     report it in the last column. Additionally, it is im-
+translation quality.                                             portant to note that there are 15 translations per
+                                                                              ZH→ EN         EN → DE         HE→ EN
+        xcomet-xl           Perfect                        Metric          MBR     Tab 1   MBR     Tab 7   MBR     Tab 8
+                            Good                           xCOMET- XL      40.27   37.49   44.03   47.31   65.05   68.31
+     MetricX-23-XL
+                                                           MetricX-23-XL   41.10   39.52   48.24   47.81   63.71   67.17
+  MetricX-23-QE-XL                                         MaTESe          35.27   33.07   44.53   43.18   60.20   61.99
+                                                           COMET           37.20   34.25   45.12   48.26   66.38   70.01
+       gemba-mqm                                           BLEURT-20       36.07   33.35   47.76   48.27   63.70   68.33
+                                                           #1 REF FREE         –   39.28      –    45.71      –    65.61
+           MaTESe                                          #2 REF FREE         –   38.78      –    45.57      –    63.25
+
+       MaTESe-QE
+                                                          Table 3: Re-Ranking Precision of reference-based met-
+         comet-qe                                         rics when used as the utility function for MBR decoding,
+    comet-qe-mqm                                          compared with the reference-based re-ranking scenario
+                                                          in the last two columns of Tables 1, 7, and 8. The last
+         CometKiwi                                        two rows of this table show the performance of the best
+     CometKiwi-XL                                         and second-best reference-free metrics in translation
+                                                          re-ranking.
+            comet
+
+        BLEURT-20
+                                                          fore not relying on the presence of reference trans-
+           da+sqm
+                                                          lations.7
+                     −8        −6         −4       −2
+                          False Positive MQM Score ∆      Metric performance in MBR decoding Table 3
+                                                          shows the translation re-ranking performance of
+Figure 2: Distribution of the MQM score ∆ between         reference-based metrics when used as the utility
+the openly available metrics’ false positive MQM scores   function for MBR decoding, and comparing it to
+and human thresholds, i.e., −4 for G OOD and −1 for       the reference-based re-ranking scenario presented
+ P ERFECT . The dataset employed is the ZH→EN split       in the last columns of Tables 1, 7, and 8. On aver-
+of WMT23MQM . Additional metrics are included in          age, the absence of reference translations reduces
+Figure 5 in the Appendix.
+                                                          performance. However, this is not true for all lan-
+                                                          guage directions, as MBR decoding outperforms
+                                                          reference-based re-ranking in ZH→EN. We be-
+source text.
+                                                          lieve this exception is due to the particularly poor
+   As shown, metric precision ranges from 30% to
+                                                          quality of the references in the ZH→EN split of
+43%, with the highest precision rates being 43.17%
+                                                          WMT23MQM , as discussed by Freitag et al. (2023).
+and 42.58%, achieved by xCOMET- ENSEMBLE and
+                                                             Furthermore, the last two rows of Table 3 present
+GEMBA - MQM , respectively. Furthermore, the top-
+                                                          the performance of the best and second-best openly
+performing metrics yield average MQM scores of
+                                                          available, reference-free metrics in translation re-
+≈ −2.50, indicating that their highest-ranked trans-
+                                                          ranking. Our results indicate that reference-based
+lations contain an average of two and a half Minor
+                                                          metrics used as the utility function for MBR de-
+errors. In contrast, human judgments suggest that
+                                                          coding tend to outperform reference-free metrics.
+the average MQM score of the highest-ranked trans-
+                                                          Specifically, the best performance is achieved by
+lations is −0.67.
+                                                          two reference-based metrics: MetricX-23-XL, in
+   Notably, reference-based metrics consistently          ZH → EN and EN → DE , and COMET in HE → EN .
+outperform reference-free ones. By looking at             Again, by looking at metrics of the same family,
+pairs of metrics of the same family, xCOMET-              MetricX-23-XL outperforms MetricX-23-QE-XL
+ENSEMBLE, MetricX-23, and MetricX-23-XL out-              across the board. These findings suggest that trans-
+perform xCOMET- QE - ENSEMBLE, MetricX-23-QE,             lation re-ranking using MBR decoding may be
+and MetricX-23-QE-XL, respectively, in ZH→EN              more reliable than QE re-ranking.8 Previous stud-
+and across the other translation directions (see Ta-
+                                                             7
+bles 7 and 8 for results concerning EN→DE and                  MBR decoding seeks the candidate translation that maxi-
+                                                          mizes an external notion of utility (Eikema and Aziz, 2022).
+HE → EN ). However, in real-world translation re-         The set of candidate translations is used as both the set of
+ranking scenarios, references are not available. To       hypotheses and to approximate a set of references. Then,
+account for this, we assess the performance of            each candidate translation is compared with all the others,
+                                                          employing reference-based metrics as the utility function.
+reference-based metrics when used as the utility             8
+                                                               This is based on the assumption that using translations
+function in an MBR decoding-like scenario, there-         generated by distinct MT systems can serve as an effective ap-
+ies have already compared MT metrics in MBR                   judgments. Finally, in a recent study, Agrawal
+decoding and QE re-ranking. For example, Freitag              et al. (2024) evaluated MT metrics’ ability to as-
+et al. (2022a) and Fernandes et al. (2022) employ             sess high-quality translations by examining their
+human annotators to evaluate the quality of trans-            correlation with human judgments, as well as their
+lations produced by MT systems when using one                 Precision, Recall, and F -score, using a setup simi-
+or the other re-ranking technique. However, due to            lar to ours. However, instead of calculating metrics
+the high cost of human annotations, these studies             thresholds from data, they arbitrarily assumed that
+were limited to including only a few metrics. Fur-            a metric indicates high-quality only if its normal-
+thermore, their findings may need to be revisited             ized assessments fall within the [0.99, 1.00] inter-
+to determine whether they remain valid with the               val. In contrast, we measure metrics performance
+introduction of new metrics. In contrast, by relying          in data filtering without making assumptions about
+solely on the human annotations released annually             the meaning of their assessments, aiming to under-
+at WMT, our setup facilitates updating results as             stand this meaning through the evaluation itself.
+soon as new metrics or datasets become available.
+                                                              7   Conclusion
+6   Related Work
+                                                              In this work, we introduce a novel evaluation
+Previous studies have focused primarily on the                framework for MT metrics. Within this frame-
+problem of Error attribution. Specifically, the               work, we measure metrics performance in i) binary
+Shared Task on Quality Estimation at WMT inves-               classification, i.e., distinguishing between G OOD
+tigated the ability of MT metrics to predict word-            and BAD , and P ERFECT and OTHER transla-
+level annotations (Zerva et al., 2022; Blain et al.,          tions, and ii) in a proxy scenario for translation
+2023). Fomicheva et al. (2022a) and Rei et al.                re-ranking, selecting the best among the transla-
+(2023b) employed attribution methods to derive                tions of the same source text. By measuring perfor-
+explanations for the predictions of MT metrics,               mance in terms of Precision, Recall, and F -score,
+measuring the faithfulness of such explanations by            we fulfill a dual purpose. First, we offer a more
+comparing them to human annotations. To tackle                intuitive interpretation of metrics’ capabilities, as
+the same issue, Perrella et al. (2022), Fernandes             compared to correlation with human judgment, and
+et al. (2023), Guerreiro et al. (2024), Kocmi and             second, we provide concrete user recommenda-
+Federmann (2023), and Xu et al. (2023) proposed               tions concerning novel MT metric use cases. We
+metrics that address the lack of Error attribution            find that MT metrics perform relatively well in
+by providing explanations in the form of either               distinguishing between G OOD and BAD transla-
+span-level annotations or natural language ratio-             tions, but struggle with Precision, especially when
+nales. Furthermore, recent studies have introduced            dealing with higher-quality translations like in the
+dedicated benchmarks to investigate the impact of              P ERFECT vs OTHER scenario. Our results show
+specific translation errors, such as disambiguation           that MetricX-23-QE-XL is the best openly avail-
+errors (Campolungo et al., 2022; Martelli et al.,             able metric for data filtering applications, while
+2024) and wrongly translated named entities (Co-              MetricX-23-XL and COMET achieve the highest
+nia et al., 2024).                                            performance in translation re-ranking. Addition-
+   In a different vein, and closer to our work,               ally, we demonstrate that reference-based MT met-
+some studies explored the meaning of raw metrics              rics, when used as the utility function in an MBR
+scores in terms of their alignment with human judg-           decoding-like scenario, outperform reference-free
+ments. Mathur et al. (2020a) studied the meaning              ones, suggesting that MBR decoding may be supe-
+of system-level score deltas for BLEU (Papineni               rior to QE re-ranking. Finally, we report notably
+et al., 2002), showing that a statistically significant       poor performance for DA+SQM annotations used
+increase of 0-3 BLEU points corresponds to signifi-           as a metric within our evaluation framework, rais-
+cantly better MT systems less than half of the time,          ing concerns about its reliability.
+in terms of human judgments. Similarly, Kocmi
+et al. (2024a) investigated the relationship between
+MT metrics’ system-level score deltas and human
+proximation of sampling from a single system. We delve into
+the differences between MBR decoding and our evaluation
+setup in the Limitations.
+8   Limitations                                          Alignment between the translation re-ranking
+                                                         scenario and the corresponding metric use cases
+Language coverage We acknowledge that the                We designed the translation re-ranking scenario
+scope of our work is limited by the available test       as a proxy for QE re-ranking and MBR decoding.
+data, covering only a few language directions.           However, our setup differs from these two use cases
+However, our evaluation framework is agnostic to         in two ways:
+the test data employed. Therefore, we leave the
+                                                           1. Candidates number: The test datasets we used
+investigation of metric performance in more lan-
+                                                              feature 15, 12, and 13 translations per source
+guage directions to future works, depending on the
+                                                              text, for ZH→EN, EN→DE, and HE→EN, re-
+availability of new annotated datasets.
+                                                              spectively. However, in QE re-ranking and
+                                                              MBR decoding it is common to work with a
+Design choices in the data filtering scenario                 larger number of candidate translations, often
+We made certain arbitrary decisions in the design of          reaching hundreds per source text.
+our framework and experimental setup. We chose
+Fβ -score to select the optimal threshold τ , with         2. Candidates selection: In QE re-ranking and
+β = √12 . While we explained our reasons for                  MBR decoding, candidate translations are typ-
+giving Precision a higher weight than Recall, it              ically sampled from the same MT system. In
+remains unclear whether β = √12 is the optimal                contrast, in our annotated datasets, each can-
+choice. Furthermore, we selected the human score              didate translation was generated by a different
+thresholds to be −4, for G OOD translations, and              MT system.
+−1 for P ERFECT ones. We recognize that practi-
+                                                         In future work, it would be interesting to investigate
+tioners might have different requirements and may
+                                                         whether our results might vary when dealing with a
+want to narrow or broaden these definitions. There-
+                                                         higher number of candidate translations or when all
+fore, we release our evaluation framework leaving
+                                                         candidates are sampled from the same MT system.
+this as an option for users.
+                                                         Acknowledgements
+Evaluation fairness in the data filtering scenario              We gratefully acknowledge the sup-
+In one of the two setups proposed, we selected the              port of the PNRR MUR project
+threshold τ to maximize the F -score on the test set            PE0000013-FAIR, and the CRE-
+used for the evaluation. This optimization process              ATIVE project (CRoss-modal un-
+might favor metrics whose assessments are more                  derstanding and gEnerATIon of Vi-
+sensitive to the underlying gold score distribution,            sual and tExtual content), which
+enabling them to achieve a better balance between               is funded by the MUR Progetti di
+Precision and Recall. As a result, discrete metrics –           Rilevante Interesse Nazionale pro-
+i.e., those that output scores within a discrete set,           gramme (PRIN 2020).
+such as the integers in [−25, 0] for GEMBA - MQM–
+might be disadvantaged compared to continuous            This work was carried out while Lorenzo Proietti
+metrics – i.e., those that output scores within a con-   was enrolled in the Italian National Doctorate on
+tinuous interval, such as the real values in [0, 1]      Artificial Intelligence run by Sapienza University
+for metrics of the COMET family. However, we             of Rome.
+argue that this limitation is inherent to the nature
+of discrete metrics rather than a flaw in our eval-
+                                                         References
+uation framework. Indeed, studying the ability of
+MT metrics to distinguish between G OOD and              Sweta Agrawal, António Farinhas, Ricardo Rei, and
+ BAD translations requires identifying the score           André F. T. Martins. 2024. Can automatic metrics
+                                                           assess high-quality translations? arXiv preprint,
+threshold that best separates them, and discrete           arXiv:2405.18348.
+metrics inherently offer a much more limited set of
+options for optimizing this threshold. Nonetheless,      Duarte Miguel Alves, José Pombal, Nuno M Guerreiro,
+                                                           Pedro Henrique Martins, João Alves, Amin Farajian,
+if discrete metrics are indeed disadvantaged, using        Ben Peters, Ricardo Rei, Patrick Fernandes, Sweta
+a development set could mitigate the impact of this        Agrawal, Pierre Colombo, José G. C. de Souza, and
+phenomenon.                                                Andre Martins. 2024. Tower: An open multilingual
+  large language model for translation-related tasks. In     Empirical Methods in Natural Language Processing,
+  Proceedings of the First Conference on Language            Miami, Florida, USA. Association for Computational
+  Modeling.                                                  Linguistics.
+
+Alejandro Barredo Arrieta, Natalia Díaz-Rodríguez,         Alexis Conneau, Kartikay Khandelwal, Naman Goyal,
+  Javier Del Ser, Adrien Bennetot, Siham Tabik, Al-          Vishrav Chaudhary, Guillaume Wenzek, Francisco
+  berto Barbado, Salvador Garcia, Sergio Gil-Lopez,          Guzmán, Edouard Grave, Myle Ott, Luke Zettle-
+  Daniel Molina, Richard Benjamins, Raja Chatila, and        moyer, and Veselin Stoyanov. 2020. Unsupervised
+  Francisco Herrera. 2020. Explainable artificial intel-     cross-lingual representation learning at scale. In Pro-
+  ligence (xai): Concepts, taxonomies, opportunities         ceedings of the 58th Annual Meeting of the Asso-
+  and challenges toward responsible ai. Information          ciation for Computational Linguistics, pages 8440–
+  Fusion, 58:82–115.                                         8451, Online. Association for Computational Lin-
+                                                             guistics.
+Frederic Blain, Chrysoula Zerva, Ricardo Rei, Nuno M.
+  Guerreiro, Diptesh Kanojia, José G. C. de Souza,         Daniel Deutsch, George Foster, and Markus Freitag.
+  Beatriz Silva, Tânia Vaz, Yan Jingxuan, Fatemeh            2023. Ties matter: Meta-evaluating modern metrics
+  Azadi, Constantin Orasan, and André Martins. 2023.         with pairwise accuracy and tie calibration. In Pro-
+  Findings of the WMT 2023 shared task on quality            ceedings of the 2023 Conference on Empirical Meth-
+  estimation. In Proceedings of the Eighth Conference        ods in Natural Language Processing, pages 12914–
+  on Machine Translation, pages 629–653, Singapore.          12929, Singapore. Association for Computational
+  Association for Computational Linguistics.                 Linguistics.
+Ondřej Bojar, Yvette Graham, and Amir Kamran. 2017.       Sören Dreano, Derek Molloy, and Noel Murphy.
+  Results of the WMT17 metrics shared task. In Pro-          2023. Tokengram_F, a fast and accurate token-based
+  ceedings of the Second Conference on Machine Trans-        chrF++ derivative. In Proceedings of the Eighth Con-
+  lation, pages 489–513, Copenhagen, Denmark. Asso-          ference on Machine Translation, pages 730–737, Sin-
+  ciation for Computational Linguistics.                     gapore. Association for Computational Linguistics.
+Ondřej Bojar, Yvette Graham, Amir Kamran, and Miloš
+                                                           Bryan Eikema and Wilker Aziz. 2020. Is MAP decoding
+  Stanojević. 2016. Results of the WMT16 metrics
+                                                             all you need? the inadequacy of the mode in neural
+  shared task. In Proceedings of the First Conference
+                                                             machine translation. In Proceedings of the 28th Inter-
+  on Machine Translation: Volume 2, Shared Task Pa-
+                                                             national Conference on Computational Linguistics,
+  pers, pages 199–231, Berlin, Germany. Association
+                                                             pages 4506–4520, Barcelona, Spain (Online). Inter-
+  for Computational Linguistics.
+                                                             national Committee on Computational Linguistics.
+Niccolò Campolungo, Federico Martelli, Francesco
+  Saina, and Roberto Navigli. 2022. DiBiMT: A novel        Bryan Eikema and Wilker Aziz. 2022. Sampling-based
+  benchmark for measuring Word Sense Disambigua-             approximations to minimum Bayes risk decoding
+  tion biases in Machine Translation. In Proceedings         for neural machine translation. In Proceedings of
+  of the 60th Annual Meeting of the Association for          the 2022 Conference on Empirical Methods in Natu-
+  Computational Linguistics (Volume 1: Long Papers),         ral Language Processing, pages 10978–10993, Abu
+  pages 4331–4352, Dublin, Ireland. Association for          Dhabi, United Arab Emirates. Association for Com-
+  Computational Linguistics.                                 putational Linguistics.
+
+Zewen Chi, Li Dong, Furu Wei, Nan Yang, Saksham            Muhammad ElNokrashy and Tom Kocmi. 2023.
+  Singhal, Wenhui Wang, Xia Song, Xian-Ling Mao,            eBLEU: Unexpectedly good machine translation eval-
+  Heyan Huang, and Ming Zhou. 2021. InfoXLM: An             uation using simple word embeddings. In Proceed-
+  information-theoretic framework for cross-lingual         ings of the Eighth Conference on Machine Trans-
+  language model pre-training. In Proceedings of the        lation, pages 746–750, Singapore. Association for
+  2021 Conference of the North American Chapter of          Computational Linguistics.
+  the Association for Computational Linguistics: Hu-
+  man Language Technologies, pages 3576–3588, On-          António Farinhas, José de Souza, and Andre Martins.
+  line. Association for Computational Linguistics.           2023. An empirical study of translation hypothesis
+                                                             ensembling with large language models. In Proceed-
+Hyung Won Chung, Thibault Fevry, Henry Tsai, Melvin          ings of the 2023 Conference on Empirical Methods in
+  Johnson, and Sebastian Ruder. 2021. Rethinking             Natural Language Processing, pages 11956–11970,
+  embedding coupling in pre-trained language models.         Singapore. Association for Computational Linguis-
+  In Proceedings of the International Conference on          tics.
+  Learning Representations.
+                                                           Patrick Fernandes, Daniel Deutsch, Mara Finkel-
+Simone Conia, Daniel Lee, Min Li, Umar Farooq Min-           stein, Parker Riley, André Martins, Graham Neubig,
+  has, Saloni Potdar, and Yunyao Li. 2024. Towards           Ankush Garg, Jonathan Clark, Markus Freitag, and
+  cross-cultural machine translation with retrieval-         Orhan Firat. 2023. The devil is in the errors: Leverag-
+  augmented generation from multilingual knowledge           ing large language models for fine-grained machine
+  graphs. In Proceedings of the 2024 Conference on           translation evaluation. In Proceedings of the Eighth
+  Conference on Machine Translation, pages 1066–            robust. In Proceedings of the Seventh Conference
+  1083, Singapore. Association for Computational Lin-       on Machine Translation (WMT), pages 46–68, Abu
+  guistics.                                                 Dhabi, United Arab Emirates (Hybrid). Association
+                                                            for Computational Linguistics.
+Patrick Fernandes, António Farinhas, Ricardo Rei,
+  José G. C. de Souza, Perez Ogayo, Graham Neubig,        Markus Freitag, Ricardo Rei, Nitika Mathur, Chi-kiu Lo,
+  and Andre Martins. 2022. Quality-aware decoding           Craig Stewart, George Foster, Alon Lavie, and Ondřej
+  for neural machine translation. In Proceedings of         Bojar. 2021b. Results of the WMT21 metrics shared
+  the 2022 Conference of the North American Chap-           task: Evaluating metrics with expert-based human
+  ter of the Association for Computational Linguistics:     evaluations on TED and news domain. In Proceed-
+  Human Language Technologies, pages 1396–1412,             ings of the Sixth Conference on Machine Translation,
+  Seattle, United States. Association for Computational     pages 733–774, Online. Association for Computa-
+  Linguistics.                                              tional Linguistics.
+Mara Finkelstein and Markus Freitag. 2024. MBR
+                                                          Naman Goyal, Jingfei Du, Myle Ott, Giri Ananthara-
+ and QE finetuning: Training-time distillation of the
+                                                            man, and Alexis Conneau. 2021. Larger-scale trans-
+ best and most expensive decoding methods. In Pro-
+                                                            formers for multilingual masked language modeling.
+ ceedings of The Twelfth International Conference on
+                                                            In Proceedings of the 6th Workshop on Represen-
+ Learning Representations.
+                                                            tation Learning for NLP (RepL4NLP-2021), pages
+Marina Fomicheva, Lucia Specia, and Nikolaos Ale-           29–33, Online. Association for Computational Lin-
+ tras. 2022a. Translation error detection as rationale      guistics.
+ extraction. In Findings of the Association for Com-
+ putational Linguistics: ACL 2022, pages 4148–4159,       Naman Goyal, Cynthia Gao, Vishrav Chaudhary, Peng-
+ Dublin, Ireland. Association for Computational Lin-        Jen Chen, Guillaume Wenzek, Da Ju, Sanjana Kr-
+ guistics.                                                  ishnan, Marc’Aurelio Ranzato, Francisco Guzmán,
+                                                            and Angela Fan. 2022. The Flores-101 evaluation
+Marina Fomicheva, Shuo Sun, Erick Fonseca,                  benchmark for low-resource and multilingual ma-
+ Chrysoula Zerva, Frédéric Blain, Vishrav Chaudhary,        chine translation. Transactions of the Association for
+ Francisco Guzmán, Nina Lopatina, Lucia Specia, and         Computational Linguistics, 10:522–538.
+ André F. T. Martins. 2022b. MLQE-PE: A multilin-
+ gual quality estimation and post-editing dataset. In     Yvette Graham, Timothy Baldwin, Alistair Moffat, and
+ Proceedings of the Thirteenth Language Resources           Justin Zobel. 2013. Continuous measurement scales
+ and Evaluation Conference, pages 4963–4974, Mar-           in human evaluation of machine translation. In Pro-
+ seille, France. European Language Resources Asso-          ceedings of the 7th Linguistic Annotation Workshop
+ ciation.                                                   and Interoperability with Discourse, pages 33–41,
+                                                            Sofia, Bulgaria. Association for Computational Lin-
+Markus Freitag, George Foster, David Grangier, Viresh       guistics.
+ Ratnakar, Qijun Tan, and Wolfgang Macherey. 2021a.
+ Experts, errors, and context: A large-scale study of     Nuno M. Guerreiro, Ricardo Rei, Daan van Stigt, Luisa
+ human evaluation for machine translation. Transac-         Coheur, Pierre Colombo, and André F. T. Martins.
+ tions of the Association for Computational Linguis-        2024. xcomet: Transparent Machine Translation
+ tics, 9:1460–1474.                                         Evaluation through Fine-grained Error Detection.
+                                                            Transactions of the Association for Computational
+Markus Freitag, David Grangier, Qijun Tan, and Bowen        Linguistics, 12:979–995.
+  Liang. 2022a. High quality rather than high model
+  probability: Minimum Bayes risk decoding with neu-
+                                                          Caglar Gulcehre, Tom Le Paine, Srivatsan Srini-
+  ral metrics. Transactions of the Association for Com-
+                                                            vasan, Ksenia Konyushkova, Lotte Weerts, Abhishek
+  putational Linguistics, 10:811–825.
+                                                            Sharma, Aditya Siddhant, Alex Ahern, Miaosen
+Markus Freitag, Nitika Mathur, Chi-kiu Lo, Elefthe-         Wang, Chenjie Gu, Wolfgang Macherey, Arnaud
+ rios Avramidis, Ricardo Rei, Brian Thompson, Tom           Doucet, Orhan Firat, and Nando de Freitas. 2023.
+ Kocmi, Frederic Blain, Daniel Deutsch, Craig Stew-         Reinforced self-training (rest) for language modeling.
+ art, Chrysoula Zerva, Sheila Castilho, Alon Lavie,         arXiv preprint, arXiv:2308.08998.
+ and George Foster. 2023. Results of WMT23 metrics
+ shared task: Metrics might be guilty but references      Pengcheng He, Jianfeng Gao, and Weizhu Chen. 2023.
+ are not innocent. In Proceedings of the Eighth Con-        DeBERTav3: Improving deBERTa using ELECTRA-
+ ference on Machine Translation, pages 578–628, Sin-        style pre-training with gradient-disentangled embed-
+ gapore. Association for Computational Linguistics.         ding sharing. In Proceedings of The Eleventh Inter-
+                                                            national Conference on Learning Representations.
+Markus Freitag, Ricardo Rei, Nitika Mathur, Chi-kiu Lo,
+  Craig Stewart, Eleftherios Avramidis, Tom Kocmi,        Zhiwei He, Xing Wang, Wenxiang Jiao, Zhuosheng
+  George Foster, Alon Lavie, and André F. T. Martins.       Zhang, Rui Wang, Shuming Shi, and Zhaopeng Tu.
+  2022b. Results of WMT22 metrics shared task: Stop         2024. Improving machine translation with human
+  using BLEU – neural metrics are better and more           feedback: An exploration of quality estimation as a
+  reward model. In Proceedings of the 2024 Confer-            Popović, Mrinmaya Sachan, and Mariya Shmatova.
+  ence of the North American Chapter of the Associ-           2024b. Error span annotation: A balanced approach
+  ation for Computational Linguistics: Human Lan-             for human evaluation of machine translation. arXiv
+  guage Technologies (Volume 1: Long Papers), pages           preprint, arXiv:2406.11580.
+  8164–8180, Mexico City, Mexico. Association for
+  Computational Linguistics.                                Taku Kudo. 2018. Subword regularization: Improv-
+                                                              ing neural network translation models with multiple
+Juraj Juraska, Mara Finkelstein, Daniel Deutsch, Aditya       subword candidates. In Proceedings of the 56th An-
+   Siddhant, Mehdi Mirzazadeh, and Markus Freitag.            nual Meeting of the Association for Computational
+   2023. MetricX-23: The Google submission to the             Linguistics (Volume 1: Long Papers), pages 66–75,
+   WMT 2023 metrics shared task. In Proceedings               Melbourne, Australia. Association for Computational
+   of the Eighth Conference on Machine Translation,           Linguistics.
+   pages 756–767, Singapore. Association for Compu-
+   tational Linguistics.                                    Shankar Kumar and William Byrne. 2004. Minimum
+                                                              Bayes-risk decoding for statistical machine transla-
+Marzena Karpinska, Nishant Raj, Katherine Thai, Yix-          tion. In Proceedings of the Human Language Tech-
+ iao Song, Ankita Gupta, and Mohit Iyyer. 2022.               nology Conference of the North American Chapter
+ DEMETR: Diagnosing evaluation metrics for trans-             of the Association for Computational Linguistics:
+ lation. In Proceedings of the 2022 Conference on             HLT-NAACL 2004, pages 169–176, Boston, Mas-
+ Empirical Methods in Natural Language Processing,            sachusetts, USA. Association for Computational Lin-
+ pages 9540–9561, Abu Dhabi, United Arab Emirates.            guistics.
+ Association for Computational Linguistics.
+                                                            Arle Lommel, Aljoscha Burchardt, and Hans Uszkor-
+Tom Kocmi, Eleftherios Avramidis, Rachel Bawden,
+                                                              eit. 2014. Multidimensional quality metrics (mqm):
+  Ondřej Bojar, Anton Dvorkovich, Christian Fed-
+                                                              A framework for declaring and describing transla-
+  ermann, Mark Fishel, Markus Freitag, Thamme
+                                                              tion quality metrics. Tradumàtica: tecnologies de la
+  Gowda, Roman Grundkiewicz, Barry Haddow,
+                                                              traducció, 0:455–463.
+  Philipp Koehn, Benjamin Marie, Christof Monz,
+  Makoto Morishita, Kenton Murray, Makoto Nagata,           Qingsong Ma, Ondřej Bojar, and Yvette Graham. 2018.
+  Toshiaki Nakazawa, Martin Popel, Maja Popović,             Results of the WMT18 metrics shared task: Both
+  and Mariya Shmatova. 2023. Findings of the 2023             characters and embeddings achieve good perfor-
+  conference on machine translation (WMT23): LLMs             mance. In Proceedings of the Third Conference on
+  are here but not quite there yet. In Proceedings of the     Machine Translation: Shared Task Papers, pages
+  Eighth Conference on Machine Translation, pages             671–688, Belgium, Brussels. Association for Com-
+  1–42, Singapore. Association for Computational Lin-         putational Linguistics.
+  guistics.
+                                                            Qingsong Ma, Johnny Wei, Ondřej Bojar, and Yvette
+Tom Kocmi, Rachel Bawden, Ondřej Bojar, Anton
+                                                              Graham. 2019. Results of the WMT19 metrics
+  Dvorkovich, Christian Federmann, Mark Fishel,
+                                                              shared task: Segment-level and strong MT sys-
+  Thamme Gowda, Yvette Graham, Roman Grund-
+                                                              tems pose big challenges. In Proceedings of the
+  kiewicz, Barry Haddow, Rebecca Knowles, Philipp
+                                                              Fourth Conference on Machine Translation (Volume
+  Koehn, Christof Monz, Makoto Morishita, Masaaki
+                                                              2: Shared Task Papers, Day 1), pages 62–90, Flo-
+  Nagata, Toshiaki Nakazawa, Michal Novák, Martin
+                                                              rence, Italy. Association for Computational Linguis-
+  Popel, and Maja Popović. 2022. Findings of the 2022
+                                                              tics.
+  conference on machine translation (WMT22). In
+  Proceedings of the Seventh Conference on Machine          Federico Martelli, Stefano Perrella, Niccolò Campol-
+  Translation (WMT), pages 1–45, Abu Dhabi, United            ungo, Tina Munda, Svetla Koeva, Carole Tiberius,
+  Arab Emirates (Hybrid). Association for Computa-            and Roberto Navigli. 2024. DiBiMT: A Gold Eval-
+  tional Linguistics.                                         uation Benchmark for Studying Lexical Ambiguity
+Tom Kocmi and Christian Federmann. 2023. GEMBA-               in Machine Translation. Computational Linguistics,
+  MQM: Detecting translation quality error spans with         pages 1–79.
+  GPT-4. In Proceedings of the Eighth Conference
+  on Machine Translation, pages 768–775, Singapore.         Nitika Mathur, Timothy Baldwin, and Trevor Cohn.
+  Association for Computational Linguistics.                  2020a. Tangled up in BLEU: Reevaluating the eval-
+                                                              uation of automatic machine translation evaluation
+Tom Kocmi, Vilém Zouhar, Christian Federmann, and             metrics. In Proceedings of the 58th Annual Meet-
+  Matt Post. 2024a. Navigating the metrics maze: Rec-         ing of the Association for Computational Linguistics,
+  onciling score magnitudes and accuracies. In Pro-           pages 4984–4997, Online. Association for Computa-
+  ceedings of the 62nd Annual Meeting of the Associa-         tional Linguistics.
+  tion for Computational Linguistics (Volume 1: Long
+  Papers), pages 1999–2014, Bangkok, Thailand. As-          Nitika Mathur, Johnny Wei, Markus Freitag, Qingsong
+  sociation for Computational Linguistics.                    Ma, and Ondřej Bojar. 2020b. Results of the WMT20
+                                                              metrics shared task. In Proceedings of the Fifth Con-
+Tom Kocmi, Vilém Zouhar, Eleftherios Avramidis,               ference on Machine Translation, pages 688–725, On-
+  Roman Grundkiewicz, Marzena Karpinska, Maja                 line. Association for Computational Linguistics.
+Subhajit Naskar, Daniel Deutsch, and Markus Freitag.        Henrique Ponde de Oliveira Pinto, Michael, Poko-
+  2023. Quality estimation using minimum Bayes risk.        rny, Michelle Pokrass, Vitchyr H. Pong, Tolly Pow-
+  In Proceedings of the Eighth Conference on Machine        ell, Alethea Power, Boris Power, Elizabeth Proehl,
+  Translation, pages 806–811, Singapore. Association        Raul Puri, Alec Radford, Jack Rae, Aditya Ramesh,
+  for Computational Linguistics.                            Cameron Raymond, Francis Real, Kendra Rimbach,
+                                                            Carl Ross, Bob Rotsted, Henri Roussez, Nick Ry-
+OpenAI, Josh Achiam, Steven Adler, Sandhini Agarwal,        der, Mario Saltarelli, Ted Sanders, Shibani Santurkar,
+  Lama Ahmad, Ilge Akkaya, Florencia Leoni Ale-             Girish Sastry, Heather Schmidt, David Schnurr, John
+  man, Diogo Almeida, Janko Altenschmidt, Sam Alt-          Schulman, Daniel Selsam, Kyla Sheppard, Toki
+  man, Shyamal Anadkat, Red Avila, Igor Babuschkin,         Sherbakov, Jessica Shieh, Sarah Shoker, Pranav
+  Suchir Balaji, Valerie Balcom, Paul Baltescu, Haim-       Shyam, Szymon Sidor, Eric Sigler, Maddie Simens,
+  ing Bao, Mohammad Bavarian, Jeff Belgum, Ir-              Jordan Sitkin, Katarina Slama, Ian Sohl, Benjamin
+  wan Bello, Jake Berdine, Gabriel Bernadett-Shapiro,       Sokolowsky, Yang Song, Natalie Staudacher, Fe-
+  Christopher Berner, Lenny Bogdonoff, Oleg Boiko,          lipe Petroski Such, Natalie Summers, Ilya Sutskever,
+  Madelaine Boyd, Anna-Luisa Brakman, Greg Brock-           Jie Tang, Nikolas Tezak, Madeleine B. Thompson,
+  man, Tim Brooks, Miles Brundage, Kevin Button,            Phil Tillet, Amin Tootoonchian, Elizabeth Tseng,
+  Trevor Cai, Rosie Campbell, Andrew Cann, Brittany         Preston Tuggle, Nick Turley, Jerry Tworek, Juan Fe-
+  Carey, Chelsea Carlson, Rory Carmichael, Brooke           lipe Cerón Uribe, Andrea Vallone, Arun Vijayvergiya,
+  Chan, Che Chang, Fotis Chantzis, Derek Chen, Sully        Chelsea Voss, Carroll Wainwright, Justin Jay Wang,
+  Chen, Ruby Chen, Jason Chen, Mark Chen, Ben               Alvin Wang, Ben Wang, Jonathan Ward, Jason Wei,
+  Chess, Chester Cho, Casey Chu, Hyung Won Chung,           CJ Weinmann, Akila Welihinda, Peter Welinder, Ji-
+  Dave Cummings, Jeremiah Currier, Yunxing Dai,             ayi Weng, Lilian Weng, Matt Wiethoff, Dave Willner,
+  Cory Decareaux, Thomas Degry, Noah Deutsch,               Clemens Winter, Samuel Wolrich, Hannah Wong,
+  Damien Deville, Arka Dhar, David Dohan, Steve             Lauren Workman, Sherwin Wu, Jeff Wu, Michael
+  Dowling, Sheila Dunning, Adrien Ecoffet, Atty Eleti,      Wu, Kai Xiao, Tao Xu, Sarah Yoo, Kevin Yu, Qim-
+  Tyna Eloundou, David Farhi, Liam Fedus, Niko Felix,       ing Yuan, Wojciech Zaremba, Rowan Zellers, Chong
+  Simón Posada Fishman, Juston Forte, Isabella Ful-         Zhang, Marvin Zhang, Shengjia Zhao, Tianhao
+  ford, Leo Gao, Elie Georges, Christian Gibson, Vik        Zheng, Juntang Zhuang, William Zhuk, and Barret
+  Goel, Tarun Gogineni, Gabriel Goh, Rapha Gontijo-         Zoph. 2024. Gpt-4 technical report. Technical report,
+  Lopes, Jonathan Gordon, Morgan Grafstein, Scott           OpenAI.
+  Gray, Ryan Greene, Joshua Gross, Shixiang Shane
+  Gu, Yufei Guo, Chris Hallacy, Jesse Han, Jeff Harris,   Kishore Papineni, Salim Roukos, Todd Ward, and Wei-
+  Yuchen He, Mike Heaton, Johannes Heidecke, Chris          Jing Zhu. 2002. Bleu: a method for automatic evalu-
+  Hesse, Alan Hickey, Wade Hickey, Peter Hoeschele,         ation of machine translation. In Proceedings of the
+  Brandon Houghton, Kenny Hsu, Shengli Hu, Xin              40th Annual Meeting of the Association for Compu-
+  Hu, Joost Huizinga, Shantanu Jain, Shawn Jain,            tational Linguistics, pages 311–318, Philadelphia,
+  Joanne Jang, Angela Jiang, Roger Jiang, Haozhun           Pennsylvania, USA. Association for Computational
+  Jin, Denny Jin, Shino Jomoto, Billie Jonn, Hee-           Linguistics.
+  woo Jun, Tomer Kaftan, Łukasz Kaiser, Ali Ka-
+  mali, Ingmar Kanitscheider, Nitish Shirish Keskar,
+                                                          Stefano Perrella, Lorenzo Proietti, Alessandro
+  Tabarak Khan, Logan Kilpatrick, Jong Wook Kim,
+                                                             Scirè, Edoardo Barba, and Roberto Navigli.
+  Christina Kim, Yongjik Kim, Jan Hendrik Kirch-
+                                                             2024. Guardians of the machine translation meta-
+  ner, Jamie Kiros, Matt Knight, Daniel Kokotajlo,
+                                                             evaluation: Sentinel metrics fall in! In Proceedings
+  Łukasz Kondraciuk, Andrew Kondrich, Aris Kon-
+                                                             of the 62nd Annual Meeting of the Association
+  stantinidis, Kyle Kosic, Gretchen Krueger, Vishal
+                                                             for Computational Linguistics (Volume 1: Long
+  Kuo, Michael Lampe, Ikai Lan, Teddy Lee, Jan
+                                                            Papers), pages 16216–16244, Bangkok, Thailand.
+  Leike, Jade Leung, Daniel Levy, Chak Ming Li,
+                                                            Association for Computational Linguistics.
+  Rachel Lim, Molly Lin, Stephanie Lin, Mateusz
+  Litwin, Theresa Lopez, Ryan Lowe, Patricia Lue,
+  Anna Makanju, Kim Malfacini, Sam Manning, Todor         Stefano Perrella, Lorenzo Proietti, Alessandro Scirè,
+  Markov, Yaniv Markovski, Bianca Martin, Katie              Niccolò Campolungo, and Roberto Navigli. 2022.
+  Mayer, Andrew Mayne, Bob McGrew, Scott Mayer               MaTESe: Machine translation evaluation as a se-
+  McKinney, Christine McLeavey, Paul McMillan,               quence tagging problem. In Proceedings of the Sev-
+  Jake McNeil, David Medina, Aalok Mehta, Jacob              enth Conference on Machine Translation (WMT),
+  Menick, Luke Metz, Andrey Mishchenko, Pamela               pages 569–577, Abu Dhabi, United Arab Emirates
+  Mishkin, Vinnie Monaco, Evan Morikawa, Daniel             (Hybrid). Association for Computational Linguistics.
+  Mossing, Tong Mu, Mira Murati, Oleg Murk, David
+  Mély, Ashvin Nair, Reiichiro Nakano, Rajeev Nayak,      Jan-Thorsten Peter, David Vilar, Daniel Deutsch, Mara
+  Arvind Neelakantan, Richard Ngo, Hyeonwoo Noh,             Finkelstein, Juraj Juraska, and Markus Freitag. 2023.
+  Long Ouyang, Cullen O’Keefe, Jakub Pachocki, Alex         There’s no data like better data: Using QE metrics
+  Paino, Joe Palermo, Ashley Pantuliano, Giambat-            for MT data filtering. In Proceedings of the Eighth
+  tista Parascandolo, Joel Parish, Emy Parparita, Alex      Conference on Machine Translation, pages 561–577,
+  Passos, Mikhail Pavlov, Andrew Peng, Adam Perel-           Singapore. Association for Computational Linguis-
+  man, Filipe de Avila Belbute Peres, Michael Petrov,        tics.
+Maja Popović. 2015. chrF: character n-gram F-score         José G. C. de Souza, Taisiya Glushkova, Duarte
+ for automatic MT evaluation. In Proceedings of the         Alves, Luisa Coheur, Alon Lavie, and André F. T.
+ Tenth Workshop on Statistical Machine Translation,         Martins. 2022. CometKiwi: IST-unbabel 2022 sub-
+ pages 392–395, Lisbon, Portugal. Association for           mission for the quality estimation shared task. In
+ Computational Linguistics.                                 Proceedings of the Seventh Conference on Machine
+                                                            Translation (WMT), pages 634–645, Abu Dhabi,
+Maja Popović. 2017. chrF++: words helping charac-          United Arab Emirates (Hybrid). Association for Com-
+ ter n-grams. In Proceedings of the Second Confer-          putational Linguistics.
+ ence on Machine Translation, pages 612–618, Copen-
+ hagen, Denmark. Association for Computational Lin-       Ananya Sai B, Tanay Dixit, Vignesh Nagarajan, Anoop
+ guistics.                                                  Kunchukuttan, Pratyush Kumar, Mitesh M. Khapra,
+                                                            and Raj Dabre. 2023. IndicMT eval: A dataset to
+Amy Pu, Hyung Won Chung, Ankur Parikh, Sebastian            meta-evaluate machine translation metrics for Indian
+ Gehrmann, and Thibault Sellam. 2021. Learning              languages. In Proceedings of the 61st Annual Meet-
+ compact metrics for MT. In Proceedings of the 2021         ing of the Association for Computational Linguis-
+ Conference on Empirical Methods in Natural Lan-            tics (Volume 1: Long Papers), pages 14210–14228,
+ guage Processing, pages 751–762, Online and Punta          Toronto, Canada. Association for Computational Lin-
+ Cana, Dominican Republic. Association for Compu-           guistics.
+ tational Linguistics.
+                                                          Thibault Sellam, Dipanjan Das, and Ankur Parikh. 2020.
+Miguel Ramos, Patrick Fernandes, António Farinhas,          BLEURT: Learning robust metrics for text genera-
+  and Andre Martins. 2024. Aligning neural machine          tion. In Proceedings of the 58th Annual Meeting of
+  translation models: Human feedback in training and        the Association for Computational Linguistics, pages
+  inference. In Proceedings of the 25th Annual Con-         7881–7892, Online. Association for Computational
+  ference of the European Association for Machine           Linguistics.
+ Translation (Volume 1), pages 258–274, Sheffield,
+  UK. European Association for Machine Translation        Rico Sennrich, Barry Haddow, and Alexandra Birch.
+  (EAMT).                                                   2016. Neural machine translation of rare words with
+                                                            subword units. In Proceedings of the 54th Annual
+Ricardo Rei, Ana C Farinha, Chrysoula Zerva, Daan
+                                                            Meeting of the Association for Computational Lin-
+  van Stigt, Craig Stewart, Pedro Ramos, Taisiya
+                                                            guistics (Volume 1: Long Papers), pages 1715–1725,
+  Glushkova, André F. T. Martins, and Alon Lavie.
+                                                            Berlin, Germany. Association for Computational Lin-
+  2021. Are references really needed? unbabel-IST
+                                                            guistics.
+  2021 submission for the metrics shared task. In Pro-
+  ceedings of the Sixth Conference on Machine Trans-
+                                                          Miloš Stanojević, Amir Kamran, Philipp Koehn, and
+  lation, pages 1030–1040, Online. Association for
+                                                            Ondřej Bojar. 2015. Results of the WMT15 metrics
+  Computational Linguistics.
+                                                            shared task. In Proceedings of the Tenth Workshop
+Ricardo Rei, Nuno M. Guerreiro, JosÃ© Pombal, Daan          on Statistical Machine Translation, pages 256–273,
+  van Stigt, Marcos Treviso, Luisa Coheur, José G.          Lisbon, Portugal. Association for Computational Lin-
+  C. de Souza, and André Martins. 2023a. Scaling up         guistics.
+  CometKiwi: Unbabel-IST 2023 submission for the
+  quality estimation shared task. In Proceedings of the   NLLB Team, Marta R. Costa-jussà, James Cross, Onur
+  Eighth Conference on Machine Translation, pages           Çelebi, Maha Elbayad, Kenneth Heafield, Kevin Hef-
+  841–848, Singapore. Association for Computational         fernan, Elahe Kalbassi, Janice Lam, Daniel Licht,
+  Linguistics.                                              Jean Maillard, Anna Sun, Skyler Wang, Guillaume
+                                                            Wenzek, Al Youngblood, Bapi Akula, Loic Bar-
+Ricardo Rei, Nuno M. Guerreiro, Marcos Treviso, Luisa       rault, Gabriel Mejia Gonzalez, Prangthip Hansanti,
+  Coheur, Alon Lavie, and André Martins. 2023b. The         John Hoffman, Semarley Jarrett, Kaushik Ram
+  inside story: Towards better understanding of ma-         Sadagopan, Dirk Rowe, Shannon Spruit, Chau
+  chine translation neural evaluation metrics. In Pro-      Tran, Pierre Andrews, Necip Fazil Ayan, Shruti
+  ceedings of the 61st Annual Meeting of the Associa-       Bhosale, Sergey Edunov, Angela Fan, Cynthia
+  tion for Computational Linguistics (Volume 2: Short       Gao, Vedanuj Goswami, Francisco Guzmán, Philipp
+  Papers), pages 1089–1105, Toronto, Canada. Associ-        Koehn, Alexandre Mourachko, Christophe Rop-
+  ation for Computational Linguistics.                      ers, Safiyyah Saleem, Holger Schwenk, and Jeff
+                                                            Wang. 2022. No language left behind: Scaling
+Ricardo Rei, Craig Stewart, Ana C Farinha, and Alon         human-centered machine translation. arXiv preprint,
+  Lavie. 2020. COMET: A neural framework for MT             arXiv:2207.04672.
+  evaluation. In Proceedings of the 2020 Conference
+  on Empirical Methods in Natural Language Process-       Haoran Xu, Amr Sharaf, Yunmo Chen, Weiting Tan,
+  ing (EMNLP), pages 2685–2702, Online. Association         Lingfeng Shen, Benjamin Van Durme, Kenton Mur-
+  for Computational Linguistics.                            ray, and Young Jin Kim. 2024. Contrastive prefer-
+                                                            ence optimization: Pushing the boundaries of llm
+Ricardo Rei, Marcos Treviso, Nuno M. Guerreiro,             performance in machine translation. arXiv preprint,
+  Chrysoula Zerva, Ana C Farinha, Christine Maroti,         arXiv:2401.08417.
+Wenda Xu, Danqing Wang, Liangming Pan, Zhenqiao                  source text. This strategy is called Group-by-Item
+ Song, Markus Freitag, William Wang, and Lei Li.                 or Segment Grouping by Deutsch et al. (2023) and
+ 2023. INSTRUCTSCORE: Towards explainable text
+                                                                 Perrella et al. (2024), respectively. Consequently,
+ generation evaluation with automatic feedback. In
+ Proceedings of the 2023 Conference on Empirical                 the final Re-Ranking Precision is the average across
+ Methods in Natural Language Processing, pages                   the Precision values computed for each source text
+ 5967–5994, Singapore. Association for Computa-                  as in Equation 4.
+ tional Linguistics.
+                                                                 Selecting the Thresholds τ For each metric, we
+Linting Xue, Noah Constant, Adam Roberts, Mihir Kale,            select the threshold τ that maximizes the F -score,
+  Rami Al-Rfou, Aditya Siddhant, Aditya Barua, and
+  Colin Raffel. 2021. mT5: A massively multilingual              either on the test or development set. To find the
+  pre-trained text-to-text transformer. In Proceedings           optimal threshold for a metric, we i) collect all its
+  of the 2021 Conference of the North American Chap-             assessments on the considered dataset, removing
+  ter of the Association for Computational Linguistics:          duplicates; ii) measure Precision, Recall, and F -
+  Human Language Technologies, pages 483–498, On-
+  line. Association for Computational Linguistics.               score corresponding to each candidate threshold
+                                                                 value; and iii) select the threshold that yields the
+Chrysoula Zerva, Frédéric Blain, Ricardo Rei, Piyawat            highest F -score.
+  Lertvittayakumjorn, José G. C. de Souza, Steffen
+  Eger, Diptesh Kanojia, Duarte Alves, Constantin                B        Datasets Statistics
+  Orăsan, Marina Fomicheva, André F. T. Martins, and
+  Lucia Specia. 2022. Findings of the WMT 2022                   Table 4 presents the number of systems, seg-
+  shared task on quality estimation. In Proceedings
+  of the Seventh Conference on Machine Translation               ments, and annotations in WMT23MQM and
+  (WMT), pages 69–99, Abu Dhabi, United Arab Emi-                WMT23DA+SQM .
+  rates (Hybrid). Association for Computational Lin-               Table 5 presents the average and median MQM
+  guistics.                                                      scores assigned to the translations in WMT23MQM
+Tianyi Zhang, Varsha Kishore, Felix Wu, Kilian Q.                and WMT22MQM .
+  Weinberger, and Yoav Artzi. 2020. Bertscore: Eval-
+  uating text generation with bert. In Proceedings of            C        The Metrics
+  the International Conference on Learning Represen-
+  tations.                                                       We consider the following metrics:
+
+A    Implementation Details                                           • COMET, COMET- QE, and COMET- QE - MQM,
+                                                                        (Rei et al., 2020, 2021) are a reference-
+Most annotated datasets used for metric evaluation                      based and two reference-free regression-based
+– such as WMT23MQM and WMT22MQM – contain                               metrics, respectively, built upon the XLM-
+a selection of source texts translated by multiple                      RoBERTa large architecture (Conneau et al.,
+MT systems. As a result, each source text is paired                     2020), and trained using datasets containing
+with several automatic translations, along with one                     human annotations in the form of Direct As-
+or more manually-curated references. In this re-                        sessments (DA) (Graham et al., 2013). Specif-
+spect, and to align the data filtering scenario to its                  ically, COMET was trained on the datasets
+real use case,9 we group the translations accord-                       released at WMT between 2017 and 2020
+ing to the MT system (or human annotator) that                          (Bojar et al., 2017; Ma et al., 2018, 2019;
+generated them, computing Precision and Recall                          Mathur et al., 2020b), while COMET- QE and
+on each group. In MT meta-evaluation, this strat-                       COMET- QE - MQM also include the DA-based
+egy is called Group-by-System or System Grouping,                       datasets released in 2015 and 2016 (Stanoje-
+by Deutsch et al. (2023) and Perrella et al. (2024),                    vić et al., 2015; Bojar et al., 2016). COMET-
+respectively. Finally, we aggregate these statistics                    QE - MQM was further fine-tuned on a split of
+across systems obtaining average Precision and Re-                      the MQM-based corpus released by Freitag
+call measures, which are used to obtain the F -score                    et al. (2021a).10
+as in Equation 3.
+   Instead, concerning the translation re-ranking                     • BLEURT-20 (Sellam et al., 2020; Pu et al.,
+scenario, translations are grouped according to their                   2021) is a regression-based metric built upon
+                                                                        the RemBERT pre-trained language model
+    9
+      When used for data filtering, MT metrics filter parallel
+                                                                     10
+corpora that typically contain only one translation per source        https://github.com/Unbabel/COMET. We used the
+text.                                                            version 2.2.1 of the COMET framework.
+                                      ZH → EN                    EN → DE                   HE→ EN
+                              Sys.     Seg.     Total    Sys.     Seg.     Total    Sys.   Seg.      Total
+          WMT23MQM              15    1177      17655     12      460      5520      13     820   10660
+          WMT23DA+SQM           15     884      13260     12      460      5520       –       –       –
+
+Table 4: Number of MT systems, source segments, and the total number of annotations in WMT23MQM
+and WMT23DA+SQM , excluding official WMT23 references employed by reference-based metrics. Concerning
+WMT23DA+SQM , we restricted the annotations to those available in WMT23MQM and discarded the rest.
+
+                                       ZH → EN              EN → DE                  HE→ EN
+                                     Avg.     Median      Avg.     Median          Avg.    Median
+                WMT23MQM         −4.21         −2.00     −7.47       −3.00     −2.35          0.00
+                WMT22MQM         −3.21         −1.00     −1.31        0.00         –             –
+
+         Table 5: Average and Median MQM scores of the translations in WMT23MQM and WMT22MQM .
+
+
+       (Chung et al., 2021). RemBERT was fine-                    include the DA for Indian languages released
+       tuned on DA-based human assessments from                   by Blain et al. (2023). 14
+       2015 to 2019, along with synthetic data.11
+                                                                • xCOMET- XL (Guerreiro et al., 2024) is a
+   • BERTscore (Zhang et al., 2020) leverages pre-                regression-based metric built upon the XLM-
+     trained encoders to extract the contextualized               RoBERTa XL architecture, trained on the con-
+     embeddings of the tokens of a translation and                catenation of DA-based human judgments re-
+     its reference. Then, it computes the cosine                  leased at WMT from 2017 and 2020 and the
+     similarity between each pair of embeddings,                  MLQE-PE dataset, and further fine-tuned us-
+     greedily matching the most similar ones.12                   ing MQM-based annotations coming from
+                                                                  the following datasets: i) WMT data from
+   • MetricX-23, MetricX-23-QE, MetricX-23-XL                     2020 to 2022, ii) IndicMT (Sai B et al., 2023),
+     and MetricX-23-QE-XL (Juraska et al., 2023)                  and iii) DEMETR (Karpinska et al., 2022).
+     are regression-based metrics built upon the                  Given a candidate translation, xCOMET- XL
+     mT5-XXL (the first two) and mT5-XL (the                      jointly identifies its error spans and assigns it
+     last two) models (Xue et al., 2021). These                   a scalar quality score. xCOMET- ENSEMBLE
+     metrics are trained using DA-based human                     and xCOMET- QE - ENSEMBLE are ensembles
+     judgments released at WMT between 2015                       between one XL and two XXL xCOMET
+     and 2020 (Stanojević et al., 2015; Bojar et al.,            checkpoints that result from different training
+     2016), and further fine-tuned on a combina-                  stages.15
+     tion of MQM-based human judgments and
+     synthetic data (Freitag et al., 2021a,b).13                • MaTESe and MaTESe-QE (Perrella et al.,
+                                                                  2022) are a reference-based and a reference-
+   • CometKiwi and CometKiwi-XL (Rei et al.,                      free metric, respectively, built upon InfoXLM
+     2022, 2023a) are reference-free regression-                  and DeBERTaV3 (He et al., 2023). MaTESe
+     based metrics, built upon InfoXLM (Chi et al.,               metrics annotate the spans of translations that
+     2021) and XLM-RoBERTa XL (Goyal et al.,                      contain an error, specifying the error sever-
+     2021), respectively. These metrics are trained               ity.16
+     using DA-based human judgments released
+     at WMT from 2017 to 2020, as well as DA                    • GEMBA - MQM (Kocmi and Federmann, 2023)
+     from the MLQE-PE corpus (Fomicheva et al.,                   is an LLM-based metric that leverages GPT-4
+     2022b). CometKiwi-XL’s training data also                    to return quality assessments in the form of
+  11                                                        14
+     https://github.com/google-research/bleurt.                See footnote 10.
+  12                                                        15
+     https://github.com/Tiiiger/bert_score.                    See footnote 10.
+  13                                                        16
+     https://github.com/google-research/metricx.               https://github.com/SapienzaNLP/MaTESe.
+       MQM annotations.17                                    • SENTINEL REF predicts the quality of a trans-
+                                                               lation based solely on its reference, without
+   • MBR-MetricX-QE (Naskar et al., 2023) is                   taking the translation itself as input.
+     based on the MBR decoding strategy. Given
+     a translation, it uses an MT system to gener-      Trained with incomplete information, these met-
+     ate pseudo-references and a reference-based        rics are not supposed to rank high in a fair meta-
+     MT metric (MetricX-23) as the MBR utility          evaluation setup. Sentinel metrics are regression-
+     function.                                          based and were trained using WMT data. In partic-
+                                                        ular, they were trained using DA annotations from
+   • BLEU (Papineni et al., 2002) is a precision-       2017 to 2020 and further fine-tuned with MQM
+     oriented metric that computes the number of        scores from 2020 to 2022.
+     overlapping n-grams between a translation
+     and its reference.18                               D        Additional Results
+                                                        In this section, we report all our results con-
+   • chrF (Popović, 2015) compares a translation       sidering all the language directions available in
+     and its reference based on the number of over-     WMT23MQM , i.e., ZH→EN, EN→DE, and HE→EN,
+     lapping character n-grams.19                       and including all MT metrics mentioned in Ap-
+                                                        pendix C.
+   • f200spBLEU (Goyal et al., 2022; Team et al.,
+                                                            Tables 6, 7, and 8 show the performance of MT
+     2022) computes BLEU scores using sub-
+                                                        metrics in the data filtering scenario when τ is se-
+     word tokenization done by the standardized
+                                                        lected as the one that maximizes F -score on the
+     FLORES-200 Sentencepiece models.20
+                                                        test set, i.e., WMT23MQM . The last two columns
+                                                        contain the performance of MT metrics in the trans-
+   • eBLEU (ElNokrashy and Kocmi, 2023)
+                                                        lation re-ranking scenario. Instead, Tables 9 and
+     matches the n-grams of semantically similar
+                                                        10 show the performance of MT metrics in the data
+     words between a candidate translation and a
+                                                        filtering scenario when τ is selected as the one that
+     reference using non-contextual word embed-
+                                                        maximizes the F -score on the development set, i.e.,
+     dings.21
+                                                        WMT22MQM , and the performance is measured on
+   • tokengram_F (Dreano et al., 2023) is de-           WMT23MQM .
+     rived from chrF++ (Popović, 2017) by replac-      The performance of lexical-based metrics All
+     ing word-based n-grams with token-based n-         lexical-based metrics fail, partially or completely,
+     grams, as obtained from popular tokenization       at tackling the data filtering task. In most cases,
+     algorithms such as BPE (Sennrich et al., 2016)     their optimal threshold is 0.023 , indicating that they
+     or Unigram (Kudo, 2018).22                         lack the sensitivity required to separate G OOD
+                                                        from BAD and P ERFECT from OTHER trans-
+In addition, we include three sentinel metrics, i.e.,
+                                                        lations, and therefore resort to maximizing recall.
+metrics designed explicitly to detect issues with the
+                                                        Instead, lexical-based metrics achieve a decent per-
+meta-evaluation (Perrella et al., 2024):
+                                                        formance in the translation re-ranking scenario.
+                                                        Nonetheless, they still perform worse than most
+   • SENTINEL CAND assesses the quality of a trans-
+                                                        neural-based metrics.
+     lation without taking its source or reference
+     as input.                                          The performance of sentinel metrics As illus-
+                                                        trated in Appendix A, we use the System Grouping
+   • SENTINEL SRC predicts the quality of a transla-    strategy to align the data filtering scenario to its
+     tion based solely on its source, without taking    real use case. Specifically, we compute Precision
+     the translation itself as input.                   and Recall on the translations of each MT system
+  17
+     https://github.com/MicrosoftTranslator/GEMBA.
+                                                        independently and then compute final statistics by
+  18
+     https://github.com/mjpost/sacrebleu.               averaging them across MT systems. As demon-
+  19
+     See footnote 18.                                   strated by Perrella et al. (2024), this setting is par-
+  20
+     See footnote 18.                                   ticularly susceptible to spurious correlations in the
+  21
+     https://github.com/munael/
+ebleu-mt-metrics-wmt23.                                     23
+                                                             Note that these metrics’ score range is either [0, 1] or
+  22
+     https://github.com/SorenDreano/tokengram_F.        [0, 100].
+evaluation data, which favor trained metrics over                 F   DA+SQM and MQM Correlation
+the rest. As a consequence, the performance of
+                                                                  Tables 11 and 12 present the segment-level corre-
+sentinel metrics is not as low as it would be in a fair
+                                                                  lation between the tested metrics and MQM when
+evaluation scenario. However, we highlight that
+                                                                  considering DA+SQM as a metric. We employ
+this scenario was intentionally designed to adhere
+                                                                  Pearson’s ρ and Kendall’s τ correlation coefficients,
+closely to the data filtering use case, and adopting
+                                                                  and acceq accuracy (Deutsch et al., 2023). As rec-
+a different grouping strategy could reduce its ef-
+                                                                  ommended by Perrella et al. (2024), we use Seg-
+fectiveness as a proxy for this task. Therefore, we
+                                                                  ment Grouping, meaning that we compute these
+argue that careful attention should be given to se-
+                                                                  statistics on groups of translations of the same
+lecting source texts in evaluation datasets, with the
+                                                                  source text, and then average them. To enable a fair
+goal of minimizing the impact of spurious correla-
+                                                                  comparison between metrics and DA+SQM, we
+tions and ultimately ensuring that sentinel metrics
+                                                                  restrict the evaluation datasets to the translations
+rank at the bottom of the metric rankings. Nonethe-
+                                                                  with available DA+SQM annotations.
+less, despite sentinel metrics performing better
+than they ideally ought to, they still do not sur-
+pass most state-of-the-art metrics, differently from
+the results obtained by Perrella et al. (2024). Sim-
+ilarly, GEMBA - MQM performs decently in many
+of our settings, whereas Perrella et al. (2024) re-
+port it ranking lower than sentinel metrics when
+using System Grouping (specifically, in two out of
+three translation directions, namely ZH→EN and
+EN → DE ).24 Given these observations, we believe
+that the binary classification setup lessens the im-
+pact of spurious correlations, as compared to the
+correlation with human judgment.
+   Instead, and as expected, sentinel metrics rank
+at the bottom in translation re-ranking. Indeed,
+the translation re-ranking scenario involves select-
+ing the best among the translations of the same
+source text, i.e., using the Segment Grouping strat-
+egy, which, as shown by Perrella et al. (2024), coun-
+ters the impact of spurious correlations in the eval-
+uation dataset.
+
+E    Additional Figures
+
+In Figures 3 and 4, we report metrics optimal
+threshold values across different language direc-
+tions. The thresholds were selected to maximize
+the F -score on the test set.
+   In Figure 5 we report the ∆ MQM score between
+the false positives and the human thresholds in the
+ G OOD and P ERFECT translations classification
+scenario.
+
+   24
+      Since GEMBA - MQM was not fine-tuned using human as-
+sessments, it should not be able to leverage spurious corre-
+lations in metrics’ training data to conduct the evaluation.
+Perrella et al. (2024) report GEMBA - MQM ranking lower than
+sentinel metrics, suggesting that the evaluation might unfairly
+favor metrics that have learned spurious correlations during
+training.
+                                             G OOD vs BAD                  P ERFECT vs OTHER            Re-ranking
+             Metric                   τ        P       R       F       τ       P        R       F      RRP     Avg.
+             xCOMET- ENSEMBLE         0.83   79.91    84.42   81.36    0.91   68.25    68.93   68.47   43.17   −2.38
+             xCOMET- XL               0.80   78.33    83.63   80.02    0.92   67.55    67.46   67.52   37.49   −2.75
+ REFERENCE
+             MetricX-23              −4.79   77.43    86.23   80.15   −2.25   63.99    73.20   66.79   39.63   −2.72
+             MetricX-23-XL           −3.52   77.80    84.46   79.90   −1.74   65.60    72.54   67.76   39.52   −2.71
+   BASED
+             MaTESe                  −4.00   76.53    78.10   77.05   −1.00   55.75    79.88   61.99   33.07   −3.18
+             COMET                    0.76   74.56    78.76   75.91    0.82   61.25    64.38   62.26   34.25   −3.06
+             BLEURT-20                0.60   72.76    82.76   75.81    0.67   55.88    69.21   59.71   33.35   −3.07
+             BERTscore                0.84   64.33    99.47   72.91    0.92   48.20    69.15   53.62   32.29   −3.20
+             xCOMET- QE - ENSEMBLE    0.83   80.40    83.47   81.40    0.92   70.00    63.60   67.73   41.40   −2.47
+             MBR-MetricX-QE           0.73   79.00    82.81   80.23    0.80   67.02    65.91   66.64   38.47   −2.40
+             MetricX-23-QE           −3.90   76.73    87.70   80.07   −1.31   67.76    67.85   67.79   37.55   −2.59
+ REFERENCE   MetricX-23-QE-XL        −3.57   77.91    83.36   79.64   −1.64   67.15    70.08   68.10   36.09   −2.83
+             GEMBA - MQM             −5.00   82.41    79.99   81.59   −1.00   64.12    74.12   67.14   42.58   −2.30
+    FREE     MaTESe-QE               −4.00   73.72    85.64   77.30    0.00   55.43    75.05   60.72   30.34   −3.59
+             COMET- QE               −0.01   75.35    82.53   77.60    0.05   59.64    68.59   62.35   37.35   −2.66
+             COMET- QE - MQM          0.08   75.40    86.33   78.72    0.10   61.63    73.84   65.22   33.52   −3.59
+             CometKiwi                0.76   78.62    80.90   79.37    0.80   64.79    66.52   65.35   39.28   −2.61
+             CometKiwi-XL             0.64   78.04    79.81   78.62    0.71   64.73    65.51   64.99   38.78   −2.60
+             BLEU                     0.00   64.06   100.00   72.78    0.00   42.13   100.00   52.20   30.09   −3.50
+ LEXICAL     chrF                     0.00   64.06   100.00   72.78    0.00   42.13   100.00   52.20   31.51   −3.39
+             eBLEU                    0.02   64.11    99.82   72.79    0.03   42.20    99.87   52.26   30.16   −3.49
+  BASED
+             f200spBLEU               0.00   64.06   100.00   72.78    0.00   42.13   100.00   52.20   30.80   −3.46
+             tokengram_F              0.00   64.06   100.00   72.78    0.00   42.13   100.00   52.20   30.55   −3.44
+
+ SENTINEL
+             SENTINEL SRC            −0.14   75.64    83.31   78.03    0.23   63.00    71.90   65.71   25.77   −4.21
+             SENTINEL REF            −0.55   71.74    91.25   77.24    0.08   59.11    73.33   63.19   25.77   −4.21
+ METRICS     SENTINEL CAND           −0.14   75.43    86.92   78.91    0.22   63.16    71.84   65.81   29.38   −3.83
+             Random-sysname          −5.00   64.06   100.00   72.78   −4.00   42.14    99.99   52.21   29.04   −3.74
+             DA+SQM                  63.50   67.83    95.95   75.18   74.67   48.30    82.61   56.06   32.99   −3.22
+
+Table 6: Metrics’ Precision, Recall, and F -score in binary classification, distinguishing G OOD from BAD ,
+and P ERFECT from OTHER translations. τ is selected to maximize the F -score on the test set. In the last
+two columns, we report metrics’ Precision in translation re-ranking and the average MQM score of the selected
+translations. The test set is WMT23MQM and the translation direction is ZH→EN. The metrics highlighted in grey
+are not openly available.
+                                             G OOD vs BAD                  P ERFECT vs OTHER            Re-ranking
+             Metric                   τ        P       R       F       τ       P        R       F      RRP     Avg.
+             xCOMET- ENSEMBLE         0.90    80.55   70.52   76.90    0.92   75.90    67.86   73.02   48.79   −3.58
+             xCOMET- XL               0.90    78.49   71.17   75.89    0.94   78.17    65.44   73.41   47.31   −3.91
+ REFERENCE
+             MetricX-23              −1.71    79.56   67.61   75.14   −1.18   75.21    68.18   72.71   52.61   −3.47
+             MetricX-23-XL           −1.55    77.62   73.98   76.37   −1.07   72.59    70.88   72.01   47.81   −3.74
+   BASED
+             MaTESe                  −1.00    71.87   72.92   72.21    0.00   67.42    60.67   65.01   43.18   −4.56
+             COMET                    0.83    72.56   70.81   71.97    0.88   81.10    55.66   70.38   48.26   −3.50
+             BLEURT-20                0.70    76.49   69.54   74.03    0.74   72.66    63.26   69.23   48.27   −3.64
+             BERTscore                0.85    57.66   81.22   63.83    0.92   68.12    40.42   55.45   43.11   −4.55
+             xCOMET- QE - ENSEMBLE    0.87    79.99   70.39   76.51    0.91   75.58    66.10   72.13   46.70   −3.90
+             MBR-MetricX-QE           0.76    78.82   70.50   75.84    0.80   74.25    66.75   71.57   48.81   −3.78
+             MetricX-23-QE           −2.07    75.65   75.84   75.71   −1.09   76.81    64.88   72.37   48.04   −3.58
+ REFERENCE   MetricX-23-QE-XL        −1.99    75.86   73.18   74.94   −1.27   74.08    68.44   72.10   45.57   −3.96
+             GEMBA - MQM             −1.00    79.69   66.77   74.86    0.00   75.07    62.04   70.16   42.52   −4.04
+    FREE     MaTESe-QE               −2.00    67.48   82.89   71.93    0.00   68.16    63.48   66.52   41.03   −5.14
+             COMET- QE                0.04    68.75   73.61   70.30    0.07   65.26    62.99   64.49   45.71   −3.84
+             COMET- QE - MQM          0.08    74.18   73.98   74.12    0.09   73.50    65.64   70.68   41.25   −4.82
+             CometKiwi                0.82    75.86   68.51   73.24    0.82   64.08    71.37   66.34   41.75   −4.32
+             CometKiwi-XL             0.69    73.52   70.71   72.56    0.73   67.44    64.13   66.30   43.67   −4.45
+             BLEU                     3.29    52.19   99.25   61.99    0.00   39.95   100.00   49.94   42.95   −4.28
+ LEXICAL     chrF                    28.67    52.59   99.47   62.39   73.11   62.32    39.61   52.32   41.43   −4.48
+             eBLEU                    0.14    52.12   99.63   61.97    0.75   62.15    37.38   50.90   40.86   −4.76
+  BASED
+             f200spBLEU               7.02    52.56   98.56   62.25   48.17   53.42    51.43   52.74   43.69   −4.21
+             tokengram_F              0.29    52.60   99.18   62.36    0.69   54.63    47.20   51.91   42.63   −4.43
+
+ SENTINEL
+             SENTINEL SRC             0.22    75.96   69.88   73.82    0.37   73.80    62.93   69.78   30.98   −7.47
+             SENTINEL REF             0.17    73.12   68.86   71.65    0.27   68.76    66.90   68.13   30.98   −7.47
+ METRICS     SENTINEL CAND            0.20    75.73   68.80   73.27    0.28   68.70    69.00   68.80   43.93   −4.72
+             Random-sysname          −4.00    52.07   99.94   61.96   −4.00   39.96    99.92   49.95   40.56   −5.36
+             DA+SQM                  77.33    59.60   85.39   66.27   82.67   48.90    77.21   55.71   37.11   −5.01
+
+Table 7: Metrics’ Precision, Recall, and F -score in binary classification, distinguishing G OOD from BAD ,
+and P ERFECT from OTHER translations. τ is selected to maximize the F -score on the test set. In the last
+two columns, we report metrics’ Precision in translation re-ranking and the average MQM score of the selected
+translations. The test set is WMT23MQM and the translation direction is EN→DE. The metrics highlighted in grey
+are not openly available.
+                                             G OOD vs BAD                  P ERFECT vs OTHER            Re-ranking
+             Metric                   τ        P       R       F       τ       P        R       F      RRP     Avg.
+             xCOMET- ENSEMBLE         0.84   83.28    85.81   84.10    0.87   83.42    80.69   82.49   69.21   −0.99
+             xCOMET- XL               0.81   82.00    87.14   83.64    0.85   81.24    82.82   81.76   68.31   −0.98
+ REFERENCE
+             MetricX-23              −4.26   82.09    86.51   83.51   −3.34   81.78    81.96   81.84   67.20   −1.11
+             MetricX-23-XL           −3.44   81.94    87.23   83.63   −3.39   79.11    88.20   81.92   67.17   −1.07
+   BASED
+             MaTESe                  −4.00   84.49    76.57   81.67   −4.00   81.86    77.99   80.53   61.99   −1.51
+             COMET                    0.77   78.96    87.93   81.74    0.81   78.95    81.31   79.72   70.01   −1.03
+             BLEURT-20                0.67   80.85    83.39   81.68    0.67   77.48    84.02   79.55   68.33   −1.04
+             BERTscore                0.92   76.33    88.14   79.90    0.93   73.89    85.97   77.52   69.88   −0.88
+             xCOMET- QE - ENSEMBLE    0.82   80.92    86.90   82.82    0.85   80.96    80.60   80.84   66.22   −1.40
+             MBR-MetricX-QE           0.74   81.57    86.17   83.05    0.74   78.01    86.65   80.69   68.09   −1.25
+             MetricX-23-QE           −1.79   80.27    89.66   83.17   −1.28   79.42    85.60   81.38   63.17   −1.46
+ REFERENCE   MetricX-23-QE-XL        −3.46   80.32    86.03   82.13   −3.19   78.27    85.08   80.41   63.25   −1.64
+             GEMBA - MQM             −7.00   79.70    89.24   82.64   −5.00   79.01    83.83   80.55   65.22   −1.26
+    FREE     MaTESe-QE               −6.00   74.35    95.01   80.16   −3.00   75.99    81.43   77.72   53.95   −2.28
+             COMET- QE               −0.03   75.62    91.71   80.32   −0.00   74.21    86.43   77.88   61.06   −1.70
+             COMET- QE - MQM          0.08   76.28    89.22   80.16    0.09   74.16    87.36   78.09   52.57   −2.32
+             CometKiwi                0.77   80.14    86.48   82.14    0.80   80.02    79.85   79.96   60.42   −1.55
+             CometKiwi-XL             0.60   77.83    89.83   81.46    0.63   76.90    84.57   79.30   65.61   −1.28
+             BLEU                     0.00   71.31   100.00   78.85    0.00   67.89   100.00   76.03   64.46   −1.38
+ LEXICAL     chrF                     0.00   71.31   100.00   78.85    0.00   67.89   100.00   76.03   65.61   −1.27
+             eBLEU                    0.02   71.36    99.94   78.88    0.02   67.93    99.94   76.05   65.29   −1.32
+  BASED
+             f200spBLEU               0.00   71.31   100.00   78.85    7.35   68.71    96.65   76.04   66.04   −1.23
+             tokengram_F              0.00   71.31   100.00   78.85    0.00   67.89   100.00   76.03   65.30   −1.24
+
+ SENTINEL
+             SENTINEL SRC            −0.10   74.72    91.11   79.48   −0.01   72.89    88.48   77.44   53.09   −2.35
+             SENTINEL REF            −0.78   73.28    96.26   79.62   −0.78   70.04    96.66   77.12   53.09   −2.35
+ METRICS     SENTINEL CAND           −0.52   74.56    93.53   79.97   −0.50   71.42    93.81   77.59   45.30   −3.04
+             Random-sysname          −5.00   71.32    99.99   78.85   −5.00   67.89    99.99   76.03   53.51   −2.08
+
+Table 8: Metrics’ Precision, Recall, and F -score in binary classification, distinguishing G OOD from BAD ,
+and P ERFECT from OTHER translations. τ is selected to maximize the F -score on the test set. In the last
+two columns, we report metrics’ Precision in translation re-ranking and the average MQM score of the selected
+translations. The test set is WMT23MQM and the translation direction is HE→EN. The metrics highlighted in grey
+are not openly available.
+                                               G OOD vs BAD                   P ERFECT vs OTHER
+                   Metric               τ         P       R       F       τ        P       R       F
+                   MetricX-23-XL      −3.93     76.58    87.01   79.77   −2.97   57.70   88.80    65.32
+      REFERENCE
+                   COMET               0.77     75.95    75.28   75.72    0.79   55.51   74.57    60.68
+        BASED
+                   BLEURT-20           0.61     73.81    79.92   75.74    0.64   52.45   76.89    58.67
+                   BERTscore           0.92     71.44    63.39   68.54    0.93   49.99   59.81    52.88
+                   MetricX-23-QE-XL   −5.45     73.36    91.88   78.64   −3.54   55.63   90.32    63.80
+      REFERENCE    COMET- QE - MQM     0.07     72.57    92.41   78.17    0.08   52.59   93.19    61.53
+                   COMET- QE          −0.02     73.77    85.81   77.39   −0.02   50.54   88.44    58.96
+         FREE
+                   CometKiwi           0.74     75.57    85.35   78.58    0.76   53.38   86.73    61.23
+                   CometKiwi-XL        0.62     75.47    83.37   77.93    0.64   53.70   85.03    61.22
+
+      LEXICAL      f200spBLEU           4.86    64.52    89.01   71.03    4.86   42.53   89.35    51.53
+                   BLEU                 5.44    64.78    85.99   70.58    5.43   42.73   86.42    51.39
+       BASED
+                   chrF                 2.08    64.04    99.84   72.73    2.08   42.09   99.77    52.14
+
+Table 9: Metrics’ Precision, Recall, and F -score in binary classification, distinguish G OOD from BAD , and
+ P ERFECT from OTHER translations. τ is selected to maximize the F -score on the development set, i.e.,
+WMT22MQM . The test set is WMT23MQM and the translation direction is ZH→EN.
+
+
+
+
+                                               G OOD vs BAD                   P ERFECT vs OTHER
+                  Metric               τ         P        R       F       τ        P       R         F
+                  MetricX-23-XL       −2.10    73.10     81.34   75.65   −1.10   71.84    71.41    71.70
+   REFERENCE
+                  COMET                0.72    57.94     94.05   66.44    0.80   53.88    84.32    61.25
+     BASED
+                  BLEURT-20            0.60    63.64     87.97   70.11    0.66   56.99    82.09    63.45
+                  BERTscore            0.68    52.15     99.84   62.03    0.68   40.00    99.79    49.99
+                  MetricX-23-QE-XL    −2.71    70.68     81.67   74.00   −1.66   67.12    76.24    69.91
+   REFERENCE      COMET- QE - MQM      0.07    72.32     76.27   73.59    0.09   69.07    71.16    69.75
+                  COMET- QE           −0.05    56.09     94.26   64.84   −0.01   47.75    87.66    56.29
+      FREE
+                  CometKiwi            0.73    60.98     90.91   68.50    0.79   55.90    83.61    62.84
+                  CometKiwi-XL         0.52    59.13     91.29   67.00    0.62   51.57    86.45    59.59
+
+   LEXICAL        f200spBLEU           3.18    52.15     99.74   62.01    3.67   40.05    99.79    50.04
+                  BLEU                 0.00    52.05    100.00   61.95    0.00   39.95   100.00    49.94
+    BASED
+                  chrF                 0.00    52.05    100.00   61.95    0.00   39.95   100.00    49.94
+
+Table 10: Metrics’ Precision, Recall, and F -score in binary classification, distinguish G OOD from BAD , and
+ P ERFECT from OTHER translations. τ is selected to maximize the F -score on the development set, i.e.,
+WMT22MQM . The test set is WMT23MQM and the translation direction is EN→DE.
+                                                                                            xcomet-e
+                                                                                            xcomet-qe-e
+               0.9                                                                          xcomet-xl
+                                                                                            MBR-MetricX-QE
+                                                                                            MetricX-23
+                                                                                            MetricX-23-QE
+               0.8                                                                          MetricX-23-XL
+
+
+ Threshold τ
+                                                                                            MetricX-23-QE-XL
+                                                                                            gemba-mqm
+                                                                                            CometKiwi-XL
+               0.7                                                                          CometKiwi
+                                                                                            MaTESe
+                                                                                            MaTESe-QE
+                                                                                            comet
+               0.6                                                                          bleurt-20
+                                                                                            comet-qe
+                                                                                            comet-qe-mqm
+
+                 zh→en                 en→de                           he→en
+
+
+Figure 3: Tested metrics’ optimal threshold values across different language directions. The thresholds were selected
+to maximize the F -score on the test set in the G OOD vs BAD binary classification scenario. Thresholds are
+normalized between 0 and 1 for improved clarity.
+
+
+               1.0                                                                          xcomet-e
+                                                                                            xcomet-qe-e
+                                                                                            xcomet-xl
+                                                                                            MBR-MetricX-QE
+               0.9                                                                          MetricX-23
+                                                                                            MetricX-23-QE
+                                                                                            MetricX-23-XL
+
+
+ Threshold τ
+                                                                                            MetricX-23-QE-XL
+               0.8                                                                          gemba-mqm
+                                                                                            CometKiwi-XL
+                                                                                            CometKiwi
+                                                                                            MaTESe
+               0.7                                                                          MaTESe-QE
+                                                                                            comet
+                                                                                            bleurt-20
+                                                                                            comet-qe
+               0.6                                                                          comet-qe-mqm
+
+                 zh→en                 en→de                           he→en
+
+
+Figure 4: Tested metrics’ optimal threshold values across different language directions. The thresholds were selected
+to maximize the F -score on the test set in the P ERFECT vs OTHER binary classification scenario. Thresholds are
+normalized between 0 and 1 for improved clarity.
+                                xcomet-e
+                                                  Perfect
+                                                  Good
+                             xcomet-qe-e
+
+                               xcomet-xl
+
+                          MBR-MetricX-QE
+
+                               MetricX-23
+
+                            MetricX-23-QE
+
+                            MetricX-23-XL
+
+                         MetricX-23-QE-XL
+
+                              gemba-mqm
+
+                                 MaTESe
+
+                              MaTESe-QE
+
+                                comet-qe
+
+                           comet-qe-mqm
+
+                               CometKiwi
+
+                            CometKiwi-XL
+
+                                   comet
+
+                              BLEURT-20
+
+                               BERTscore
+
+                                   BLEU
+
+                                     chrF
+
+                                   eBLEU
+
+                              f200spBLEU
+
+                              tokengram F
+
+                              sentinelsrc
+
+                              sentinelref
+
+                            sentinelcand
+
+                          Random-sysname
+
+                                 da+sqm
+
+                                            −10    −8         −6        −4        −2
+                                                     False Positive MQM Score ∆
+
+
+Figure 5: Distribution of the MQM score ∆ between metrics’ false positive MQM scores and human thresholds, i.e.,
+−4 for G OOD and −1 for P ERFECT . The dataset is the ZH→EN split of WMT23MQM .
+                              Metric                         τ       ρ     acceq
+                              GEMBA - MQM                  0.36    0.43     0.52
+                              xCOMET- ENSEMBLE             0.30    0.42     0.54
+                              xCOMET- QE - ENSEMBLE        0.26    0.37     0.53
+                              xCOMET- XL                   0.26    0.38     0.52
+                              MBR-MetricX-QE               0.29    0.43     0.53
+                              MetricX-23                   0.26    0.37     0.53
+                              MetricX-23-QE                0.24    0.35     0.52
+                              MetricX-23-XL                0.25    0.36     0.52
+                              CometKiwi                    0.25    0.37     0.52
+                              CometKiwi-XL                 0.25    0.38     0.52
+                              COMET                        0.25    0.36     0.51
+                              BLEURT-20                    0.26    0.37     0.52
+                              MaTESe                       0.27    0.33     0.48
+                              COMET- QE - MQM              0.16    0.21     0.48
+                              MaTESe-QE                    0.21    0.24     0.44
+                              DA+SQM                       0.11    0.20     0.42
+                              Random-sysname               0.02    0.02     0.38
+
+Table 11: Kendall τ and Pearson ρ correlation coefficients, and acceq accuracy (Deutsch et al., 2023), measured
+between the DA+SQM- and MQM-based annotations, and between MT metrics and MQM. The data is the
+intersection between WMT23MQM and WMT23DA+SQM . The language direction is ZH→EN.
+
+
+
+
+                              Metric                         τ       ρ     acceq
+                              GEMBA - MQM                  0.40    0.48     0.57
+                              MBR-MetricX-QE               0.40    0.54     0.58
+                              xCOMET- ENSEMBLE             0.38    0.54     0.60
+                              xCOMET- XL                   0.37    0.51     0.60
+                              MetricX-23                   0.37    0.51     0.60
+                              COMET                        0.37    0.51     0.58
+                              BLEURT-20                    0.37    0.49     0.57
+                              MetricX-23-XL                0.36    0.49     0.59
+                              xCOMET- QE - ENSEMBLE        0.36    0.51     0.59
+                              MetricX-23-QE                0.36    0.51     0.60
+                              COMET- QE                    0.35    0.47     0.57
+                              MetricX-23-QE-XL             0.35    0.45     0.59
+                              CometKiwi-XL                 0.35    0.50     0.57
+                              CometKiwi                    0.33    0.46     0.57
+                              COMET- QE - MQM              0.29    0.39     0.54
+                              MaTESe                       0.29    0.33     0.53
+                              MaTESe-QE                    0.28    0.34     0.52
+                              DA+SQM                       0.17    0.29     0.46
+                              Random-sysname               0.08    0.12     0.41
+
+Table 12: Kendall τ and Pearson ρ correlation coefficients, and acceq accuracy (Deutsch et al., 2023), measured
+between the DA+SQM- and MQM-based annotations, and between MT metrics and MQM. The data is the
+intersection between WMT23MQM and WMT23DA+SQM . The language direction is EN→DE.
+
