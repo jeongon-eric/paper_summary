@@ -7,76 +7,54 @@
 
 ---
 
-## Abstract (400+자)
+## Abstract
 
-시각적 추론을 위한 새로운 다중 에이전트 시스템인 MATA (Multi-Agent hierarchical Trainable Automaton)를 제안합니다. 기존 방법들은 종종 고정된 실행 순서를 따르거나 에이전트 간 통신 프로토콜이 복잡하여 제한적인 추론 능력만을 제공합니다. MATA는 계층적 유한 상태 오토마톤으로 제시되며, 최상위 전이는 학습 가능한 하이퍼 에이전트가 선택하고, 각 에이전트는 규칙 기반 서브 오토마톤을 실행하여 마이크로 컨트롤을 수행합니다. 핵심 혁신은 하이퍼 에이전트의 상태 전이 정책을 훈련할 수 있다는 것입니다. MATA-SFT-90K라는 90,854개의 훈련 예제를 포함하는 데이터셋을 구축했습니다. GQA, OK-VQA, Referring Expression Comprehension 벤치마크에서 최첨단 결과를 달성하여 이전 방법들을 크게 앞서며 MATA의 효과성을 입증합니다.
-
----
-
-## Method (400+자)
-
-### 계층적 오토마톤 구조
-
-MATA는 두 수준으로 구성된 계층적 아키텍처를 가집니다:
-
-1. **하이퍼 오토마톤 (Hyper Automaton)**: 
-   - 학습 가능한 상태 전이 정책
-   - 각 상태는 특정 에이전트 유형을 나타냄
-   - LLM 기반 컨트롤러가 다음 상태 선택
-
-2. **서브 오토마톤 (Sub Automata)**:
-   - 규칙 기반 마이크로 컨트롤
-   - 각 에이전트의 세분화된 행동 정의
-   - 효율적인 실행 보장
-
-### 상태 종류
-
-1. **INITIAL**: 초기 상태
-2. **ONESHOT**: 일회성 추론 (간단한 질문에 적합)
-3. **STEPWISE**: 단계별 추론 (복잡한 다단계 작업)
-4. **SPECIALIZED**: 전문 에이전트 (특정 도메인)
-5. **FINAL**: 최종 결과 도출
-6. **FAILURE**: 실패 상태
-
-### 학습 방법
-
-하이퍼 에이전트의 상태 전이 정책은 MATA-SFT-90K 데이터셋을 통해 훈련됩니다:
-- 전이-트래jectory 트리를 SFT 형식으로 변환
-- 도메인 특정 SFT로 소규모 LLM도 효과적
-- 학습된 전이가 규칙 기반 접근법 우위
+We present MATA (Multi-Agent hierarchical Trainable Automaton), a novel multi-agent system for visual reasoning. While existing methods often follow rigid execution orders or have complex inter-agent communication protocols, providing only limited reasoning capabilities, MATA is presented as a hierarchical finite-state automaton. The top-level transitions are chosen by a trainable hyper agent, while each agent runs a rule-based sub-automaton for micro-control. The key innovation is that the hyper agent's state transition policy can be trained. We build MATA-SFT-90K, a dataset of 90,854 training examples. MATA achieves state-of-the-art results on GQA, OK-VQA, and Referring Expression Comprehension benchmarks, significantly outperforming previous methods.
 
 ---
 
-## Datasets & Experiments (400+자)
+## Method
 
-### MATA-SFT-90K 데이터셋
+### Hierarchical Automaton Structure
 
-90,854개의 훈련 예제를 포함:
-- 다양한 시각적 추론 작업
-- 전이-트래jectory 트리 형식
-- 상태 전이에 대한 명시적 레이블
+MATA consists of two-level hierarchical architecture:
 
-### 평가 벤치마크
+1. **Hyper Automaton**: 
+   - Trainable state transition policy
+   - Each state represents a specific agent type
+   - LLM-based controller selects next state
 
-1. **GQA**: 시각적 추론을 위한 대규모 벤치마크
-2. **OK-VQA**: 외부 지식이 필요한 시각적 질문 응답
-3. **Referring Expression Comprehension**:
-   - RefCOCO
-   - RefCOCO+
-   - RefCOCOg
+2. **Sub Automata**:
+   - Rule-based micro-control
+   - Defines fine-grained behaviors for each agent
+   - Ensures efficient execution
 
-### 실험 설정
-
-- **하이퍼 에이전트 LLM**: 0.6B ~ 8B
-- **비교 방법**:
-  - ViperGPT
-  - VisRep
-  - HYDRA
-  - GPT-4o
+### State Types
+1. **INITIAL**: Initial state
+2. **ONESHOT**: One-shot reasoning (for simple queries)
+3. **STEPWISE**: Step-by-step reasoning (for complex multi-step tasks)
+4. **SPECIALIZED**: Specialized agent (for specific domains)
+5. **FINAL**: Final result derivation
+6. **FAILURE**: Failure state
 
 ---
 
-## Results (800+자)
+## Datasets & Experiments
+
+### MATA-SFT-90K Dataset
+90,854 training examples including:
+- Various visual reasoning tasks
+- Transition-trajectory tree format
+- Explicit labels for state transitions
+
+### Evaluation Benchmarks
+1. **GQA**: Large-scale benchmark for visual reasoning
+2. **OK-VQA**: Visual question answering requiring external knowledge
+3. **Referring Expression Comprehension**: RefCOCO, RefCOCO+, RefCOCOg
+
+---
+
+## Results
 
 ### Table 1: GQA Performance
 
@@ -95,28 +73,11 @@ MATA는 두 수준으로 구성된 계층적 아키텍처를 가집니다:
 | DWIM | 62.8 |
 | **MATA** | **76.5** |
 
-### Table 3: Referring Expression Comprehension
-
-| Method | RefCOCO | RefCOCO+ | RefCOCOg |
-|--------|---------|-----------|----------|
-| NAVER | 95.9 | 93.3 | 90.4 |
-| **MATA** | **96.3** | **93.9** | **90.8** |
-
-### Table 4: 에이전트 수별 성능 (GQA)
-
-| # Agents | Accuracy (%) |
-|----------|--------------|
-| 1 | 61.5 |
-| 2 | 64.5 |
-| 3 | 64.9 |
-| 4 | 65.0 |
-
-### 주요 발견
-
-1. **GQA에서 +27% 향상**: ViperGPT 대비 27%p 증가
-2. **도메인 간 일반화 kuat**: 1% 미만의 성능 저하로 전이 가능
-3. **소규모 LLM 효과적**: 도메인 특정 SFT로 0.6B 모델도 경쟁력
-4. **3개 에이전트가 최적**: 추가 에이전트에서 수익 체감
+### Key Findings
+1. **+27% improvement on GQA** over ViperGPT
+2. **Strong cross-domain generalization** with <1% performance degradation
+3. **Effective even with small LLMs** when using domain-specific SFT
+4. **3 agents optimal** with diminishing returns beyond
 
 ---
 
@@ -124,34 +85,34 @@ MATA는 두 수준으로 구성된 계층적 아키텍처를 가집니다:
 
 ### Figure 1: MATA Overview
 ![Teaser](image/teaser.png)
-- 오토마톤 구조 개요: 선형 파이프라인 vs 계층적 오토마톤
+- Automaton structure: Linear pipeline vs Hierarchical automaton
 
 ### Figure 2: Pipeline
 ![Pipeline](image/pipeline.png)
-- 학습 파이프라인: 전이-트래jectory → SFT
+- Training pipeline: Transition-trajectory → SFT
 
 ### Figure 3: Accuracy vs Model Size
 ![Size](image/accuracy_vs_size.png)
-- 모델 크기별 성능: 0.6B ~ 8B
+- Performance by model size: 0.6B ~ 8B
 
 ### Figure 4: Number of Agents
 ![Agents](image/accuracy_vs_num_agents.png)
-- 에이전트 수별 성능 변화
+- Performance by number of agents
 
 ---
 
 ## Main Contributions
 
-1. **계층적 오토마톤 설계**: 신경기호 framework와 다중 에이전트 design의 결합
-2. **학습 가능한 전이 메커니즘**: 데이터 기반 의사결정으로 규칙 기반 우위
-3. **MATA-SFT-90K 데이터셋**: 90,854개의 훈련 예제
-4. **SOTA 성능 달성**: GQA, OK-VQA, Referring Expression에서 최고
+1. **Hierarchical automaton design**: Combining neuro-symbolic framework with multi-agent design
+2. **Trainable transition mechanism**: Data-driven decision making
+3. **MATA-SFT-90K dataset**: 90,854 training examples
+4. **State-of-the-art performance** on GQA, OK-VQA, Referring Expression
 
 ---
 
 ## Key Findings
 
-- 학습된 전이 정책이 규칙 기반 접근법 우위
-- 3개 에이전트가 최적 tradeoff 제공
-- 도메인 간 전이 kuat (<1% 차이)
-- 소규모 LLM도 도메인 특정 SFT로 효과적
+- Learned transition policies outperform rule-based approaches
+- 3 agents provide optimal tradeoff
+- Strong cross-domain transfer (<1% difference)
+- Small LLMs effective with domain-specific SFT

@@ -8,104 +8,78 @@
 
 ---
 
-## Abstract (400+자)
+## Abstract
 
-자율주행 에이전트를 위한 LLM 생성 시나리오를 포함하는 공개 벤치마크数据集 AgentDrive를 소개합니다. 현재 에이전트 AI 추론 평가는 제한된 시나리오와 작업 복잡성으로 인해 어려움을 겪고 있습니다. AgentDrive는 300,000개의 LLM 생성 driving 시나리오를 포함하며, 7개의 직교 축에 걸쳐 인수분해된 시나리오 공간을 공식화합니다. 또한 LLM 기반 프롬프트-JSON 파이프라인을 사용하여 구조화된 시나리오 생성을 자동화합니다. 벤치마크는 AgentDrive-MCQ를 포함하며, 물리, 정책, 하이브리드, 시나리오, 비교 추론을 포함하는 100,000개의 추론 질문이 포함됩니다. 50개 주요 LLM을 평가한 결과, 독점 프론티어 모델이 맥락적/정책 추론에서 우위를 보이며, 고급 오픈 모델이 구조적/물리적 추론에서 빠르게追赶하고 있음을 발견했습니다.
-
----
-
-## Method (400+자)
-
-### 인수분해된 시나리오 공간 (7개 축)
-
-1. **시나리오 유형 (Scenario Type)**:
-   - 차선 변경, 교차로 진입, 합류, 회전, 유턴 등
-
-2. **운전자 행동 (Driver Behavior)**:
-   - 규정 준수, 공격적, 산만, 음주/마약 상태
-
-3. **환경 (Environment)**:
-   - 날씨 (맑음, 비, 눈, 안개)
-   - 시야 (양호, 보통, 나쁨)
-   - 시간대 (낮, 밤, 새벽/황혼)
-
-4. **도로 레이아웃 (Road Layout)**:
-   - 고속도로, 도심 도로, 로터리, 터널, 교량
-
-5. **목표 (Objective)**:
-   - 안전 항법, 추월, 비상 정지, 주차
-
-6. **난이도 (Difficulty)**:
-   - 쉬움, 중간, 복잡
-
-7. **교통 밀도 (Traffic Density)**:
-   - 희소, 중간, 혼잡
-
-### LLM 기반 시나리오 생성
-
-프롬프트-JSON 파이프라인:
-1. 시나리오 템플릿 정의
-2. LLM이 파라미터 생성
-3. JSON 스키마로 구조화
-4. 시뮬레이션에서 검증
+We introduce AgentDrive, an open benchmark dataset containing LLM-generated driving scenarios for autonomous driving agents. Current agentic AI reasoning evaluation suffers from limited scenarios and task complexity. AgentDrive contains 300,000 LLM-generated driving scenarios with a factorized scenario space across seven orthogonal axes. We also automate structured scenario generation using an LLM-driven prompt-to-JSON pipeline. The benchmark includes AgentDrive-MCQ with 100,000 reasoning questions spanning physics, policy, hybrid, scenario, and comparative reasoning. Evaluation of 50 leading LLMs shows that proprietary frontier models dominate in contextual/policy reasoning, while advanced open models are rapidly closing the gap in structured/physics reasoning.
 
 ---
 
-## Datasets & Experiments (400+자)
+## Method
+
+### Factorized Scenario Space (7 Axes)
+
+1. **Scenario Type**: Lane change, intersection, merging, turning, U-turn
+
+2. **Driver Behavior**: Compliant, aggressive, distracted, impaired
+
+3. **Environment**: Weather (clear, rain, snow, fog), visibility, time of day
+
+4. **Road Layout**: Highway, urban, roundabout, tunnel, bridge
+
+5. **Objective**: Safe navigation, overtaking, emergency stop, parking
+
+6. **Difficulty**: Easy, moderate, complex
+
+7. **Traffic Density**: Sparse, medium, congested
+
+### LLM-based Scenario Generation
+Prompt-to-JSON pipeline:
+1. Define scenario templates
+2. LLM generates parameters
+3. Structure as JSON schema
+4. Validate in simulation
+
+---
+
+## Datasets & Experiments
 
 ### AgentDrive-Gen
-
-300,000개의 생성된 시나리오:
-- 다양한 상황 조합
-- 구조화된 JSON 형식
-- 시뮬레이션 호환
+300,000 generated scenarios:
+- Diverse situation combinations
+- Structured JSON format
+- Simulation compatible
 
 ### AgentDrive-Sim
-
-시뮬레이션 데이터셋:
-- 대리 안전 메트릭
-- 해석 가능한 결과 레이블
-- 안전_목표, 안전_정지, 비효율적, 안전하지 않음
+Simulation dataset:
+- Surrogate safety metrics
+- Interpretable outcome labels
+- safe_goal, safe_stop, inefficient, unsafe
 
 ### AgentDrive-MCQ
-
-100,000개의 추론 질문:
-1. **Physics**: 차량 동역학 물리 추론
-2. **Policy**: 교통 규칙 및 정책 이해
-3. **Hybrid**: 물리 + 정책 결합 추론
-4. **Scenario**: 상황 인식 평가
-5. **Comparative**: 시나리오 간 비교 추론
+100,000 reasoning questions:
+1. **Physics**: Vehicle dynamics physical reasoning
+2. **Policy**: Traffic rule and policy understanding
+3. **Hybrid**: Combined physics + policy reasoning
+4. **Scenario**: Situational assessment
+5. **Comparative**: Cross-scenario comparison
 
 ---
 
-## Results (800+자)
+## Results
 
-### Table 1: Benchmark 비교
+### Table 1: Benchmark Comparison
 
-| Benchmark | 시나리오 수 | 추론 질문 | 추론 차원 | 생성 방식 |
-|-----------|-------------|-----------|-----------|----------|
-| LaMPilot | 10K | 10K | 3 | 수동 |
-| V2V-LLM | 5K | 5K | 2 | 수동 |
-| STSBench | 15K | - | 1 | 수동 |
-| AD²-Bench | 8K | - | 2 | 수동 |
-| **AgentDrive** | **300K** | **100K** | **5** | **LLM 생성** |
+| Benchmark | Scenarios | Questions | Dimensions |
+|-----------|-----------|-----------|------------|
+| LaMPilot | 10K | 10K | 3 |
+| V2V-LLM | 5K | 5K | 2 |
+| STSBench | 15K | - | 1 |
+| **AgentDrive** | **300K** | **100K** | **5** |
 
-### Table 2: LLM 평가 결과 (상위 10개)
-
-| Model | Physics | Policy | Hybrid | Scenario | Overall |
-|-------|---------|--------|--------|----------|---------|
-| GPT-5 | 92.3 | 94.1 | 91.5 | 89.2 | 91.8 |
-| ChatGPT-4o | 89.7 | 91.2 | 88.4 | 86.5 | 88.9 |
-| Gemini 2.5 Pro | 88.5 | 90.1 | 87.2 | 85.8 | 87.9 |
-| DeepSeek V3 | 87.2 | 88.5 | 86.1 | 84.2 | 86.5 |
-| Qwen3 235B | 85.8 | 87.3 | 84.5 | 82.9 | 85.1 |
-
-### 주요 발견
-
-1. **독점 모델 우위**: 맥락적/정책 추론에서 프론티어 모델 우위
-2. **오픈 모델追赶**: 구조적/물리적 추론에서 빠르게追赶
-3. ** впер**. 완전한 생성적, 시뮬레이션 기반, 추론 지향 벤치마크
-4. **대규모 평가**: 50개 LLM 포괄적 평가
+### Key Findings
+1. **Proprietary model advantage**: Frontier models lead in contextual/policy reasoning
+2. **Open model catch-up**: Rapid improvement in structured/physics reasoning
+3. **First principled benchmark**: Combining generative synthesis with structured reasoning
 
 ---
 
@@ -113,33 +87,29 @@
 
 ### Figure 1: AgentDrive Overview
 ![Overview](AgentDrive_MCQ.png)
-- 벤치마크 구성요소: Gen, Sim, MCQ
+- Benchmark components: Gen, Sim, MCQ
 
 ### Figure 2: Difficulty Heatmap
 ![Heatmap](fig_heatmap_layout_difficulty.png)
-- 난이도별 성능 히트맵
+- Performance by difficulty
 
 ### Figure 3: Weather Distribution
 ![Weather](fig_weather_share.png)
-- 날씨별 시나리오 분포
-
-### Figure 4: Layout Analysis
-![Layout](fig_top10_layouts.png)
-- 상위 10개 레이아웃 분석
+- Scenario distribution by weather
 
 ---
 
 ## Main Contributions
 
-1. **300K 시나리오, 100K 질문**: 최대 규모의 드라이빙 에이전트 벤치마크
-2. **7개 축 인수분해**: 포괄적 시나리오 공간 공식화
-3. **LLM 기반 자동 생성**: 효율적인 시나리오 확장
-4. **50개 LLM 평가**: 포괄적 모델 비교 분석
+1. **300K scenarios, 100K questions**: Largest driving agent benchmark
+2. **7-axis factorization**: Comprehensive scenario space formalization
+3. **LLM-based automatic generation**: Efficient scenario scaling
+4. **50 LLM evaluation**: Comprehensive model comparison
 
 ---
 
 ## Key Findings
 
-- 독점 모델이 맥락적/정책 추론에서 우위
-- 오픈 模型이 물리적 추론에서 빠르게追赶
-- 추론 차원별 모델 성능 상이
+- Proprietary models lead in contextual/policy reasoning
+- Open models catching up in physics reasoning
+- Model performance varies by reasoning dimension
