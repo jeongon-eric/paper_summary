@@ -9,7 +9,7 @@
 
 ## Abstract
 
-We propose COLT, a lightweight multi-LLM collaboration framework using MCTS reasoning sharing. COLT achieves 53% latency reduction and 87% cost reduction over LLMCompiler while maintaining quality.
+We propose COLT (Collaborative Optimization via Lightweight Threads), a lightweight multi-LLM collaboration framework for compiler optimization. While recent LLMs have proven effective for code generation and transformation, a single LLM struggles to make complex optimization decisions. COLT implements multi-LLM collaboration through Monte Carlo Tree Search (MCTS) reasoning sharing. The key innovation is that the current model generates a reasoning tree which collaborating models use to select arms. Information communication is performed through shared KV cache, reducing communication overhead. Compared to LLMCompiler, COLT achieves 53% latency reduction and 87% cost reduction while achieving equal or better performance.
 
 ---
 
@@ -17,27 +17,24 @@ We propose COLT, a lightweight multi-LLM collaboration framework using MCTS reas
 
 Compiler optimization is complex and traditionally relies on expert-designed heuristics. Recent LLMs can help but single models struggle with complex optimization decisions.
 
-Key challenges:
-1. **Single model limitations**: Cannot handle all optimization types
-2. **Communication overhead**: Multi-agent approaches often expensive
-3. **Reasoning complexity**: Optimization requires deep reasoning
+Key challenges include: single model limitations where one model cannot handle all optimization types, communication overhead where multi-agent approaches are often expensive, and reasoning complexity where optimization requires deep reasoning.
 
-COLT addresses these by:
-- Sharing reasoning trees between models
-- Using MCTS for structured exploration
-- Leveraging complementary model strengths
+COLT addresses these by sharing reasoning trees between models, using MCTS for structured exploration, and leveraging complementary model strengths through collaborative decision-making.
 
 ---
 
 ## Method
 
-### MCTS-based collaboration with shared KV cache
+### COLT Architecture
+1. **Reasoning Tree Generation**: Master model generates decision tree
+2. **Arm Selection**: Collaborating models select optimal branches
+3. **Shared KV Cache**: Reduces communication overhead
 
 ---
 
 ## Results
 
-### Table 1: Performance
+### Table 1: Performance Comparison
 
 | Method | Latency | Cost |
 |--------|---------|------|
@@ -55,6 +52,7 @@ COLT addresses these by:
 
 ## Main Contributions
 
-1. MCTS-based collaboration
-2. Shared KV cache efficiency
-3. Both latency and cost improvement
+1. MCTS-based lightweight collaboration framework
+2. Shared KV cache for efficiency
+3. Both latency and cost improvements
+4. Practical compiler optimization application

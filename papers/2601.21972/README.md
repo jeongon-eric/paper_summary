@@ -23,42 +23,28 @@ Decentralized systems have been studied for decades, where each agent is deploye
 
 Although Monte Carlo methods are widely adopted in RL fine-tuning due to their simplicity and efficiency, extending them to optimize multi-LLM collaboration faces many difficulties. Agents need to wait until the end of an episode to receive return signals with high variance. This leads to poor sample efficiency and limits practicality in long-horizon or episodic tasks.
 
-In this paper, we develop Multi-Agent Actor-Critic (MAAC) methods for optimizing decentralized LLM collaboration. We analyze when and why MAAC methods are beneficial for MARL fine-tuning and introduce 2 approaches: CoLLM-CC that employs a centralized critic to estimate joint history values, and CoLLM-DC that uses decentralized critics to estimate individual history values. Our evaluation across writing, coding, and game-playing domains shows that in dense-reward and short-horizon writing tasks, Monte Carlo methods and CoLLM-DC achieve performance comparable to CoLLM-CC; while in sparse-reward coding tasks and long-horizon Minecraft tasks, both underperform CoLLM-CC.
+In this paper, we develop Multi-Agent Actor-Critic (MAAC) methods for optimizing decentralized LLM collaboration. We analyze when and why MAAC methods are beneficial for MARL fine-tuning and introduce 2 approaches: CoLLM-CC that employs a centralized critic to estimate joint history values, and CoLLM-DC that uses decentralized critics to estimate individual history values.
 
 ---
 
 ## Method
 
-### MA-REINFORCE (Multi-Agent REINFORCE)
-MA-REINFORCE is a class of multi-agent policy gradient methods where each agent maintains an individual policy πθi and updates it according to Monte-Carlo estimates of joint returns. However, this method does not scale well to long-horizon online learning because return signals are only available at dialog termination and Monte Carlo estimates suffer from high variance.
-
-### Multi-Agent Actor-Critic (MAAC)
-To reduce variance and improve sample efficiency, Actor-Critic methods learn a policy model (actor) πθ and a value model (critic) Vϕ. In the multi-agent setting, AC methods are used with Decentralized Critics (DC) or Centralized Critic (CC).
-
 ### CoLLM-CC (Centralized Critic)
-CoLLM-CC learns a shared value function Vϕ(ht) that conditions on the joint history ht to update each agent's policy. Since the critic is just a training construct, it can be removed during execution, allowing agents to execute in a decentralized manner.
+Learns a shared value function Vϕ(ht) that conditions on the joint history to update each agent's policy. The critic is a training construct that can be removed during execution, allowing agents to execute in a decentralized manner.
 
 ### CoLLM-DC (Decentralized Critic)
-CoLLM-DC uses individual critics Vϕi(hi,t) that condition on each agent's local history. This may be harder to converge due to non-stationarity accumulating during training.
+Uses individual critics Vϕi(hi,t) that condition on each agent's local history. This may be harder to converge due to non-stationarity accumulating during training.
 
 ---
 
 ## Datasets & Experiments
 
-### TLDR Summarization
-Two Qwen3-1.7B agents summarize Reddit posts. One acts as a high-level summarizer producing a concise paragraph, and one serves as a detailed summarizer.
-
-### arXiv Expansion
-Same agents expand paper abstracts into full introductions.
-
-### CoopHE (Cooperative Code Generation)
-The CoopHumanEval dataset focuses on problems that naturally admit cooperative decomposition.
-
-### StrBuild (Minecraft String Building)
-Agents collaboratively build structures matching exact strings while maintaining even material distribution.
-
-### HouseBuild (Minecraft House Building)
-Agents collaboratively construct houses while defending against hostile mobs.
+### Tasks
+1. **TLDR Summarization**: Two agents summarize Reddit posts with different roles
+2. **arXiv Expansion**: Agents expand paper abstracts into full introductions
+3. **CoopHE**: Cooperative code generation dataset
+4. **StrBuild**: Minecraft string building task
+5. **HouseBuild**: Minecraft house building with enemy defense
 
 ---
 
@@ -88,28 +74,11 @@ Agents collaboratively construct houses while defending against hostile mobs.
 ### Figure 4: arXiv Results
 ![arXiv](figs/writing_arxiv.png)
 
-### Figure 5: Code Generation
-![CodeGen](figs/codegen_coophe.png)
-
-### Figure 6: Minecraft StrBuild
-![Minecraft](figs/minecraft_str.png)
-
-### Figure 7: Minecraft HouseBuild
-![HouseBuild](figs/minecraft_box.png)
-
 ---
 
 ## Main Contributions
 
-1. Developed MAAC methods for decentralized LLM collaboration and analyzed their advantages
-2. Proposed two approaches: CoLLM-CC and CoLLM-DC
-3. Comprehensive evaluation across writing, coding, and game-playing domains
-4. Demonstrated CoLLM-CC's superiority in long-horizon and sparse-reward tasks
-
----
-
-## Key Findings
-
-- CoLLM-CC achieves lowest variance and best sample efficiency
-- Monte Carlo methods require substantially more samples in long-horizon tasks
-- CoLLM-DC struggles to converge due to non-stationarity
+1. Developed MAAC methods for decentralized LLM collaboration
+2. Proposed CoLLM-CC and CoLLM-DC approaches
+3. Comprehensive evaluation across writing, coding, and gaming
+4. Demonstrated CoLLM-CC's superiority in long-horizon tasks

@@ -11,7 +11,7 @@
 
 ## Abstract
 
-We introduce Attributional NLI (Att-NLI), a framework that extends traditional NLI with principles from social psychology to assess agents' capacity for abductive intentional inference. Att-NLI consists of two stages: (1) Abduction - inferring latent intentions from observations, and (2) Deduction - deriving logical conclusions from intentions. We evaluate through Undercover-V game and show Neuro-Symbolic Att-NLI achieves 78.29% improvement over Standard NLI.
+We introduce Attributional NLI (Att-NLI), a framework that extends traditional NLI with principles from social psychology to assess agents' capacity for abductive intentional inference. While traditional NLI only judges relationships between premise and hypothesis (entailment, contradiction, neutral), Att-NLI applies abductive reasoning from social psychology. The framework consists of two stages: (1) Abduction - inferring latent intentions from observations, and (2) Deduction - deriving logical conclusions from intentions. We evaluate three agent types through Undercover-V, a verifiable social-deduction game: Standard NLI, Standard Att-NLI, and Neuro-Symbolic Att-NLI. Experimental results show that Neuro-Symbolic Att-NLI achieves 78.29% spy win rate improvement over Standard NLI.
 
 ---
 
@@ -19,27 +19,18 @@ We introduce Attributional NLI (Att-NLI), a framework that extends traditional N
 
 Understanding intentional behavior is crucial for AI systems that interact with humans. Traditional Natural Language Inference (NLI) focuses on entailment, contradiction, and neutral relationships between premise and hypothesis. However, this approach fails to capture the deeper reasoning about WHY someone made a particular claim.
 
-The key question is: Can AI agents infer the latent intentions behind observed actions? This is essential for:
-- Trust in AI systems
-- Explainable AI
-- Multi-agent collaboration
-- Social reasoning
+The key question is: Can AI agents infer the latent intentions behind observed actions? This is essential for trust in AI systems, explainable AI, multi-agent collaboration, and social reasoning.
 
-We propose Attributional NLI (Att-NLI), which extends NLI with social psychology principles:
-1. **Abductive Reasoning**: From observations to possible intentions
-2. **Deductive Reasoning**: From intentions to predicted actions
-
-This framework enables agents to not just understand WHAT happened, but WHY it happened - essential for social AI.
+We propose Attributional NLI (Att-NLI), which extends NLI with social psychology principles: (1) Abductive Reasoning - from observations to possible intentions, and (2) Deductive Reasoning - from intentions to predicted actions. This framework enables agents to understand not just WHAT happened, but WHY it happened - essential for social AI.
 
 ---
 
 ## Method
 
 ### Three Agent Types
-
-1. **Standard NLI Agent**: Deduction only
-2. **Standard Att-NLI Agent**: Abduction → Deduction
-3. **Neuro-Symbolic Att-NLI**: + Isabelle/HOL theorem prover
+1. **Standard NLI Agent**: Uses deduction only
+2. **Standard Att-NLI Agent**: Implements abduction → deduction pipeline
+3. **Neuro-Symbolic Att-NLI Agent**: Integrates Isabelle/HOL theorem prover for validation
 
 ---
 
@@ -66,6 +57,7 @@ This framework enables agents to not just understand WHAT happened, but WHY it h
 
 ## Main Contributions
 
-1. Attributional NLI framework for intention inference
-2. Undercover-V verifiable game
+1. Attributional NLI framework extending NLI with social psychology
+2. Undercover-V verifiable game for empirical testing
 3. Demonstrated effectiveness of neuro-symbolic integration
+4. 78.3% improvement over baseline

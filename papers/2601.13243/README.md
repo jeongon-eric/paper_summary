@@ -9,32 +9,28 @@
 
 ## Abstract
 
-We conduct a comprehensive evaluation of reasoning paradigms spanning direct single-model generation, Chain-of-Thought (CoT), and Multi-Agent Systems (MAS). We introduce MIMeBench for semantic abstraction and contrastive discrimination. Our findings reveal that increased structural complexity does not consistently improve reasoning, with benefits dependent on task suitability.
+We conduct a comprehensive evaluation of reasoning paradigms spanning direct single-model generation, Chain-of-Thought (CoT) augmented reasoning, and Multi-Agent Systems (MAS). While existing studies often evaluate single reasoning modalities or compare only specific MAS workflows, we analyze these in a unified manner and introduce MIMeBench, a new benchmark targeting semantic abstraction and contrastive discrimination. Our findings reveal that increased structural complexity does not consistently improve reasoning performance, with benefits highly dependent on paradigm properties and task suitability. We also show that CoT is not always beneficial, and MAS workflows can be effective or ineffective depending on task types.
 
 ---
 
 ## Introduction
 
-LLM reasoning has evolved through multiple paradigms:
-1. **Direct Generation**: Simple input-output mapping
-2. **Chain-of-Thought**: Step-by-step reasoning
-3. **Multi-Agent Systems**: Collaborative reasoning
+LLM reasoning has evolved through multiple paradigms: Direct Generation for simple input-output mapping, Chain-of-Thought for step-by-step reasoning, and Multi-Agent Systems for collaborative reasoning.
 
-However, we lack understanding of:
-- When each paradigm works best
-- How paradigm choice affects performance
-- Cost-benefit tradeoffs between approaches
+However, we lack understanding of when each paradigm works best, how paradigm choice affects performance, and cost-benefit tradeoffs between approaches.
 
-This paper provides systematic comparison across paradigms to understand:
-- Which paradigm suits which task
-- When additional complexity is worthwhile
-- Optimal configurations for different scenarios
+This paper provides systematic comparison across paradigms to understand which paradigm suits which task, when additional complexity is worthwhile, and optimal configurations for different scenarios.
 
 ---
 
 ## Method
 
-### Paradigms: Direct, CoT, Plan-and-Execute, Reflection, Debate
+### Paradigms Evaluated
+1. **Direct Generation**: Simple input-output
+2. **Chain-of-Thought**: Step-by-step reasoning
+3. **Plan-and-Execute**: Planning then execution
+4. **Reflection**: Self-correction
+5. **Debate**: Multi-agent discussion
 
 ---
 
@@ -59,6 +55,7 @@ This paper provides systematic comparison across paradigms to understand:
 
 ## Main Contributions
 
-1. Comprehensive paradigm evaluation
-2. MIMeBench benchmark
+1. Comprehensive unified evaluation of reasoning paradigms
+2. MIMeBench for semantic abstraction testing
 3. Cost-accuracy tradeoff analysis
+4. Guidelines for paradigm selection

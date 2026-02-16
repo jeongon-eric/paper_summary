@@ -9,7 +9,7 @@
 
 ## Abstract
 
-We present MATA (Multi-Agent hierarchical Trainable Automaton), a novel multi-agent system for visual reasoning. MATA is presented as a hierarchical finite-state automaton where top-level transitions are chosen by a trainable hyper agent, while each agent runs a rule-based sub-automaton for micro-control. We build MATA-SFT-90K, a dataset of 90,854 training examples, and achieve state-of-the-art results on GQA, OK-VQA, and Referring Expression benchmarks.
+We present MATA (Multi-Agent hierarchical Trainable Automaton), a novel multi-agent system for visual reasoning. While existing methods often follow rigid execution orders or have complex inter-agent communication protocols, providing only limited reasoning capabilities, MATA is presented as a hierarchical finite-state automaton. The top-level transitions are chosen by a trainable hyper agent, while each agent runs a rule-based sub-automaton for micro-control. The key innovation is that the hyper agent's state transition policy can be trained. We build MATA-SFT-90K, a dataset of 90,854 training examples. MATA achieves state-of-the-art results on GQA, OK-VQA, and Referring Expression Comprehension benchmarks, significantly outperforming previous methods.
 
 ---
 
@@ -17,20 +17,9 @@ We present MATA (Multi-Agent hierarchical Trainable Automaton), a novel multi-ag
 
 Visual reasoning remains a challenging task for AI systems, requiring understanding of complex scenes, spatial relationships, and contextual information. While LLMs have shown impressive reasoning capabilities, applying them to visual tasks introduces unique challenges.
 
-Existing approaches include:
-1. **Monolithic VLMs**: Single models handling all aspects
-2. **Compositional Methods**: Breaking tasks into subcomponents
-3. **Multi-Agent Systems**: Multiple agents collaborating
+Existing approaches include monolithic VLMs, compositional methods, and multi-agent systems. However, these approaches often suffer from rigid execution orders, complex communication protocols, and limited reasoning capabilities.
 
-However, these approaches often suffer from:
-- Rigid execution orders
-- Complex communication protocols
-- Limited reasoning capabilities
-
-MATA addresses these issues by introducing a hierarchical automaton where:
-- A hyper agent decides which specialized agent to use
-- Each sub-agent handles specific reasoning tasks
-- The system can be trained to optimize transition decisions
+MATA addresses these issues by introducing a hierarchical automaton where: a hyper agent decides which specialized agent to use, each sub-agent handles specific reasoning tasks, and the system can be trained to optimize transition decisions. This allows the system to learn when to use which type of reasoning, rather than relying on fixed rules.
 
 ---
 
@@ -74,7 +63,7 @@ MATA addresses these issues by introducing a hierarchical automaton where:
 
 ## Main Contributions
 
-1. Hierarchical automaton design
-2. Trainable transition mechanism
-3. MATA-SFT-90K dataset (90,854 examples)
-4. SOTA on GQA, OK-VQA, RefCOCO
+1. Hierarchical automaton design combining neuro-symbolic and multi-agent approaches
+2. Trainable transition mechanism replacing hand-written rules
+3. MATA-SFT-90K dataset with 90,854 training examples
+4. State-of-the-art on GQA, OK-VQA, RefCOCO
