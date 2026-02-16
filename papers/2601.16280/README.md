@@ -15,11 +15,21 @@ We propose a comprehensive diagnostic framework for evaluating tool invocation r
 
 ---
 
+## Introduction
+
+Recent advances in LLM-based multi-agent systems have demonstrated significant potential for solving complex tasks through tool invocation. However, while these systems show impressive capabilities in single-step tool usage, their reliability in multi-step workflows remains unclear.
+
+The challenge lies in understanding how these systems behave when coordinating multiple agents, each potentially calling different tools at different stages of task execution. Unlike single-agent scenarios, multi-agent systems introduce additional complexity in terms of coordination, shared state management, and error propagation.
+
+This paper addresses this gap by proposing a systematic diagnostic framework for evaluating procedural reliability. We focus on understanding not just whether tasks succeed, but HOW they fail - identifying specific failure modes that can be addressed in future system design.
+
+Our contributions include: (1) a comprehensive error taxonomy with 12 categories, (2) systematic evaluation across 15 LLM configurations, (3) identification of reliability thresholds for production deployment, and (4) practical recommendations for system design.
+
+---
+
 ## Method
 
 ### 12-Category Error Taxonomy
-
-We propose a systematic error taxonomy for multi-agent LLM system failures:
 
 1. **Tool Initialization Failures**:
    - DB_UPDATE_TOOL_NOT_INITIALIZED
@@ -46,41 +56,25 @@ We propose a systematic error taxonomy for multi-agent LLM system failures:
 ## Datasets & Experiments
 
 ### Invoice Reconciliation Task
-The evaluation uses Invoice Reconciliation, which involves:
-1. Database queries for relevant data
-2. File processing for invoices and receipts
-3. Business logic for comparison and reconciliation
-4. Result generation
+Involves: database queries, file processing, business logic comparison, result generation.
 
 ### Test Configurations
-- **LLM Configurations**: 15 configurations (Open-weight + Proprietary)
-  - Qwen2.5 series (3B, 7B, 14B, 32B, 72B)
-  - Functionary
-  - GPT-4, GPT-4.1, Claude 3.5, Claude 3.7
-
-- **Hardware Platforms**:
-  - NVIDIA RTX A6000
-  - NVIDIA RTX 4090
-  - Apple M3 Max
+- **LLM Configurations**: 15 configurations including Qwen2.5 series (3B-72B), GPT-4, Claude 3.5
+- **Hardware Platforms**: NVIDIA RTX A6000, RTX 4090, Apple M3 Max
 
 ---
 
 ## Results
 
-### Table 1: Overall Invoice Reconciliation Performance
+### Table 1: Overall Performance
 
-| Model | Platform | Success Rate (%) | Time (s) | Steps |
-|-------|----------|------------------|----------|-------|
-| qwen2.5:3b | GPU | 23.64 | 14.7 | 5.4 |
-| qwen2.5:7b | GPU | 85.45 | 12.3 | 4.2 |
-| qwen2.5:14b | GPU | 96.64 | 7.3 | 3.1 |
-| qwen2.5:32b | GPU | 100.0 | 6.8 | 2.9 |
-| GPT-4.1 | API | 100.0 | 7.2 | 3.0 |
-
-### Key Findings
-1. **Reliability Threshold**: 14B parameters is minimum viable (96.6%), 32B achieves closed-source level (100%)
-2. **Initialization Dominates**: Over 60% of errors are tool initialization failures
-3. **Scale Effect**: Reliability improves significantly with model scale
+| Model | Success Rate (%) | Time (s) | Steps |
+|-------|------------------|----------|-------|
+| qwen2.5:3b | 23.64 | 14.7 | 5.4 |
+| qwen2.5:7b | 85.45 | 12.3 | 4.2 |
+| qwen2.5:14b | 96.64 | 7.3 | 3.1 |
+| qwen2.5:32b | 100.0 | 6.8 | 2.9 |
+| GPT-4.1 | 100.0 | 7.2 | 3.0 |
 
 ---
 
@@ -88,22 +82,12 @@ The evaluation uses Invoice Reconciliation, which involves:
 
 ### Figure 1: Error Taxonomy Overview
 ![Error Taxonomy](figures/figure-000.png)
-- (a) Superior procedural reliability of closed-source models
-- (b) Dramatic variation in open-weight models with scale
 
 ---
 
 ## Main Contributions
 
-1. **Systematic diagnostic framework** with 12-category error taxonomy
-2. **Reproducible evaluation infrastructure** across 15 LLM configurations
-3. **Reliability threshold identification**: 14B (minimum production), 32B (closed-source level)
-4. **Deployment guidance** with hardware-performance characterization
-
----
-
-## Key Findings
-
-- Tool initialization failures are the primary reliability bottleneck
-- Open-weight models at 32B scale achieve closed-source reliability
-- 14B models offer optimal cost-performance tradeoff
+1. Systematic diagnostic framework with 12-category error taxonomy
+2. Reproducible evaluation across 15 LLM configurations
+3. Reliability threshold identification
+4. Deployment guidance with hardware-performance characterization

@@ -13,6 +13,20 @@ Recent work has explored optimizing LLM collaboration through Multi-Agent Reinfo
 
 ---
 
+## Introduction
+
+Advanced LLMs have demonstrated remarkable capabilities in natural language understanding and generation. This progress has driven growing efforts to transform them into autonomous agents that can solve tasks by proactively interacting with users and systems to obtain feedback and learn from past experience.
+
+In this context, it is becoming popular to explore coordinating multiple LLMs to improve performance where agents are specified by roles, such as generators, planners, or verifiers. Building on the studies of Multi-Agent Systems (MAS), recent methods employ Multi-Agent Reinforcement Learning (MARL) to optimize their interactions. However, most existing approaches remain confined to predefined execution paradigms, which limits their applicability to broader settings. Moreover, these agents often rely on extensive inter-agent communication to accomplish tasks, requiring centralized execution, which results in limited scalability as well as potential privacy issues in larger-scale MAS.
+
+Decentralized systems have been studied for decades, where each agent is deployed separately and executes independently based on its own observations. Leveraging decentralized LLM agents to complete tasks is beneficial, as it reduces memory and storage pressure on each node and improves efficiency. However, how to effectively optimize these decentralized LLMs to collaborate remains an open question.
+
+Although Monte Carlo methods are widely adopted in RL fine-tuning due to their simplicity and efficiency, extending them to optimize multi-LLM collaboration faces many difficulties. Agents need to wait until the end of an episode to receive return signals with high variance. This leads to poor sample efficiency and limits practicality in long-horizon or episodic tasks.
+
+In this paper, we develop Multi-Agent Actor-Critic (MAAC) methods for optimizing decentralized LLM collaboration. We analyze when and why MAAC methods are beneficial for MARL fine-tuning and introduce 2 approaches: CoLLM-CC that employs a centralized critic to estimate joint history values, and CoLLM-DC that uses decentralized critics to estimate individual history values. Our evaluation across writing, coding, and game-playing domains shows that in dense-reward and short-horizon writing tasks, Monte Carlo methods and CoLLM-DC achieve performance comparable to CoLLM-CC; while in sparse-reward coding tasks and long-horizon Minecraft tasks, both underperform CoLLM-CC.
+
+---
+
 ## Method
 
 ### MA-REINFORCE (Multi-Agent REINFORCE)
@@ -32,19 +46,19 @@ CoLLM-DC uses individual critics Vϕi(hi,t) that condition on each agent's local
 ## Datasets & Experiments
 
 ### TLDR Summarization
-Two Qwen3-1.7B agents summarize Reddit posts. One acts as a high-level summarizer producing a concise paragraph, and one serves as a detailed summarizer. Quality is evaluated using weighted sum of structure, style consistency, and logical coherence metrics.
+Two Qwen3-1.7B agents summarize Reddit posts. One acts as a high-level summarizer producing a concise paragraph, and one serves as a detailed summarizer.
 
 ### arXiv Expansion
-Same agents expand paper abstracts into full introductions. One outlines research background and motivation, the other presents proposed methods and experiments.
+Same agents expand paper abstracts into full introductions.
 
 ### CoopHE (Cooperative Code Generation)
-The CoopHumanEval dataset focuses on problems that naturally admit cooperative decomposition. An auxiliary agent implements lightweight utilities supporting the primary agent to produce core logic.
+The CoopHumanEval dataset focuses on problems that naturally admit cooperative decomposition.
 
 ### StrBuild (Minecraft String Building)
-Agents collaboratively build structures matching exact strings while maintaining even material distribution. IoU is used as evaluation metric.
+Agents collaboratively build structures matching exact strings while maintaining even material distribution.
 
 ### HouseBuild (Minecraft House Building)
-Agents collaboratively construct houses conforming to architectural specifications while defending against hostile mobs. Average health points indicate successful defense.
+Agents collaboratively construct houses while defending against hostile mobs.
 
 ---
 
@@ -58,54 +72,39 @@ Agents collaboratively construct houses conforming to architectural specificatio
 | GRPO | 91.7 | 91.0 | 46.1 | 54.6 |
 | CoLLM-CC | **95.2** | **95.0** | **68.5** | **52.7** |
 
-### Key Findings
-1. In short-horizon writing tasks, all methods achieve similar performance
-2. In long-horizon Minecraft tasks, CoLLM-CC significantly outperforms others
-3. Monte Carlo methods require substantially more samples
-4. CoLLM-DC fails to converge in long-horizon settings due to non-stationarity
-
 ---
 
 ## Key Figures
 
 ### Figure 1: CoLLM-CC Framework
 ![Framework](figs/framework.png)
-- (a) Agent model structure with Transformer blocks and KV-Cache
-- (b) Overall centralized-critic architecture
-- (c) Critic model structure
 
 ### Figure 2: CoLLM-DC Framework
 ![Framework-DC](figs/framework-dc.png)
-- Decentralized critic architecture: each agent has individual critic
 
 ### Figure 3: TLDR Results
 ![TLDR](figs/writing_tldr.png)
-- Learning curves on TLDR summarization task
 
 ### Figure 4: arXiv Results
 ![arXiv](figs/writing_arxiv.png)
-- Learning curves on arXiv expansion task
 
 ### Figure 5: Code Generation
 ![CodeGen](figs/codegen_coophe.png)
-- Results on CoopHE code generation task
 
 ### Figure 6: Minecraft StrBuild
 ![Minecraft](figs/minecraft_str.png)
-- Example of ICML-shaped building task
 
 ### Figure 7: Minecraft HouseBuild
 ![HouseBuild](figs/minecraft_box.png)
-- Example of house construction with enemy defense
 
 ---
 
 ## Main Contributions
 
-1. **Developed MAAC methods for decentralized LLM collaboration** and analyzed their advantages
-2. **Proposed two approaches**: CoLLM-CC with centralized critic and CoLLM-DC with decentralized critics
-3. **Comprehensive evaluation** across writing, coding, and game-playing domains
-4. **Demonstrated CoLLM-CC's superiority** in long-horizon and sparse-reward tasks
+1. Developed MAAC methods for decentralized LLM collaboration and analyzed their advantages
+2. Proposed two approaches: CoLLM-CC and CoLLM-DC
+3. Comprehensive evaluation across writing, coding, and game-playing domains
+4. Demonstrated CoLLM-CC's superiority in long-horizon and sparse-reward tasks
 
 ---
 
@@ -114,4 +113,3 @@ Agents collaboratively construct houses conforming to architectural specificatio
 - CoLLM-CC achieves lowest variance and best sample efficiency
 - Monte Carlo methods require substantially more samples in long-horizon tasks
 - CoLLM-DC struggles to converge due to non-stationarity
-- Centralized critic provides more stable gradient estimates than decentralized
