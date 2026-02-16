@@ -1,0 +1,2055 @@
+Published as a conference paper at ICLR 2026
+
+MATA: A T RAINABLE H IERARCHICAL AUTOMATON
+S YSTEM FOR M ULTI -AGENT V ISUAL R EASONING
+
+arXiv:2601.19204v1 [cs.AI] 27 Jan 2026
+
+Zhixi Cai, Fucai Ke, Kevin Leo, Sukai Huang, Maria Garcia de la Banda, Peter J. Stuckey,
+Hamid Rezatofighi
+Monash University, Australia
+{zhixi.cai,fucai.ke1,kevin.leo,sukai.huang,maria.garciadelabanda,
+peter.stuckey,hamid.rezatofighi}@monash.edu
+
+Hyper 
+
+Agent
+
+Rule-based Transition
+Trainable Transition
+
+Hyper Agent
+Control Transitions
+
+Image & Query
+Traverse all
+possible transitions
+
+Hyper 
+
+Automaton
+
+...
+
+...
+
+...
+
+...
+
+...
+
+...
+
+...
+
+...
+
+Agents
+Sub- 
+
+Automata
+
+Transition Trajectory Tree
+
+Sub Modules
+
+Convert to SFT format
+Current Memory
+
+Sub Modules
+(a) Linear Pipeline
+
+...
+...
+...
+...
+...
+
+Sub Modules
+
+(b) Hierarchical Automaton (Ours)
+
+Best Next State
+
+Supervised Finetune (SFT)
+
+Hyper Agent
+(c) Hyper Agent (Ours) Training
+
+Figure 1: Overview of MATA. (a) Linear pipelines (previous methods) execute modules in a fixed,
+manually designed order. (b) MATA organizes agents as states in a hyper automaton. A trainable
+hyper agent learns high-level transitions between agents (blue arrows), enabling collaboration and
+competition, while each agent runs a small rule-based sub-automaton for reliable micro-control
+(black arrows). (c) To train the hyper agent, we expand a transition-trajectory tree per image-query,
+score the leaves using task metrics, and convert each node’s snapshot into a supervised pair current
+memory → best next state for supervised finetuning (SFT), forming MATA-SFT-90K.
+
+A BSTRACT
+Recent vision-language models have strong perceptual ability but their implicit
+reasoning is hard to explain and easily generates hallucinations on complex
+queries. Compositional methods improve interpretability, but most rely on a single agent or hand-crafted pipeline and cannot decide when to collaborate across
+complementary agents or compete among overlapping ones. We introduce MATA
+(Multi-Agent hierarchical Trainable Automaton), a multi-agent system presented
+as a hierarchical finite-state automaton for visual reasoning whose top-level transitions are chosen by a trainable hyper agent. Each agent corresponds to a state
+in the hyper automaton, and runs a small rule-based sub-automaton for reliable
+micro-control. All agents read and write a shared memory, yielding transparent execution history. To supervise the hyper agent’s transition policy, we build
+transition-trajectory trees and transform to memory-to-next-state pairs, forming
+the MATA-SFT-90K dataset for supervised finetuning (SFT). The finetuned LLM
+as the transition policy understands the query and the capacity of agents, and it
+can efficiently choose the optimal agent to solve the task. Across multiple visual
+reasoning benchmarks, MATA achieves the state-of-the-art results compared with
+monolithic and compositional baselines. The code and dataset are available at
+https://github.com/ControlNet/MATA.
+
+1
+
+Published as a conference paper at ICLR 2026
+
+1
+
+I NTRODUCTION
+
+Visual reasoning is the cognitive process of interpreting and analyzing relationships among entities
+in a visual scene to support decision-making and problem-solving (Ke et al., 2025b). Although
+recent Vision-Language Models (VLMs) (Liu et al., 2023a; Chen et al., 2024; Bai et al., 2025b)
+demonstrate strong perceptual ability, their implicit reasoning is difficult to audit and often causes
+hallucinations on complex queries involving spatial relations, spatial attributes, and counting. Compositional approaches (Surís et al., 2023; You et al., 2023; Ke et al., 2024; Cai et al., 2025) improve
+interpretability by decomposing a task into planning, perception, and reasoning stages, typically employing Large Language Models (LLMs) (Gemini-Team, 2023; OpenAI, 2024; DeepSeek-AI, 2025)
+as planners or code generators and Vision Foundation Models (VFMs) (Radford et al., 2021; Liu
+et al., 2023b; Xiao et al., 2024; Yang et al., 2024) as perceptual tools. Despite these improvements,
+non-agentic compositional methods (Surís et al., 2023; Lu et al., 2023) struggle in practice: they are
+limited to a single-turn reasoning, thus lacking the ability to incrementally reason in a closed-loop.
+Due to these limitations, agentic methods (You et al., 2023; Ke et al., 2024; Gao et al., 2024; Zhong
+et al., 2025) treat visual reasoning as a multi-step feedback loop in which agents actively take actions
+based on the current state (Ke et al., 2025b).
+However, most agentic systems still employ a single agent, which is often insufficient for complex
+reasoning (Wang et al., 2025c) as different skills are required for different parts of a problem. Further, in prior multi-agent methods (Hong et al., 2023; Li et al., 2024; Nguyen et al., 2025; Zhang
+et al., 2025) (developed for other domains), collaborative agents are assigned disjoint roles for different subtasks and are organized into hard-coded pipelines. While this is simple and interpretable,
+it prevents error and hallucination handling, and tends to propagate upstream mistakes through the
+pipeline (Gao et al., 2024; Ke et al., 2025a). In contrast, a competition mechanism where functionally overlapping agents for the same subtask work together is under-explored in previous work. In
+this paper, we explore compositional multi-agent visual reasoning in an environment where collaborative and competitive agents exist.
+Motivated by the requirements above, we cast this decision problem as a finite-state automaton
+where the transition function picks a discrete next state and the lifecycle is naturally expressed by
+explicit states and transitions. This provides explainability, verifiable control flow, and modularity
+that yield greater versatility, reliability, and performance. A recent work (Cai et al., 2025) also used
+an automaton, but its hand-written rule-based transitions are inflexible and difficult to manually
+define as states and transitions grow (Wang et al., 2025a; Yue et al., 2025; Dang et al., 2025; Wan
+et al., 2025). When new agents are added, their transitions need to be manually defined. Designing
+rules to select among functionally overlapping (competitive) agents is hard since the criteria are
+ambiguous and task-dependent, and human priors about which agents fit which tasks and queries
+are uncertain. We therefore design a trainable hyper agent to learn a transition policy that selects
+the next state. Notably, not every transition needs learning: within an agent, micro-steps (e.g.,
+LLM/VLM prompting, verifier checks, tool I/O) follow clear procedures that are easy to define. As
+the number of agents grows, the main difficulty is cross-agent transition rather than agent’s inside
+control. This motivates a hierarchical automaton in which each top-level state is an agent with
+a small rule-based sub-automaton, and a trainable hyper agent provides the transition function that
+observes the shared memory and selects the next agent. All agents read and write to a shared memory
+that records variables, tool outputs, code history, and verifier feedback, recording an explainable
+process. This replaces an inflexible rule-based transition policy with a data-driven, error-aware,
+and dynamic policy that can redirect to alternative solutions when needed. This design focuses on
+learning the ambiguous selection between competitive agents, while preserving reliable execution
+inside agents.
+We introduce these ideas in MATA (Multi-Agent hierarchical Trainable Automaton), a hierarchical
+automaton for visual reasoning. MATA contains a specialized agent for fast, System 1-style perception (e.g., object detection, simple question answers); a slow, System 2-style step-wise reasoner that
+generates and executes Python programs for multi-step inference; and a one-shot workflow reasoner
+that solves queries without iteration.
+To supervise the hyper agent, we need labeled transition decisions. We therefore run the system for
+each image-query pair, expand a transition trajectory tree (Kearns et al., 2002) and log the state history, prompts, intermediate artifacts (detections, captions, code), feedback, and performance results.
+2
+
+Published as a conference paper at ICLR 2026
+
+The leaves are scored by the appropriate task performance, and each decision is labeled with the
+child that leads to the highest-scoring subtree. This generates memory-to-next-state pairs (MATASFT-90K) for LLM supervised finetuning (SFT), as shown in Figure 1 (c).
+The contributions of our paper are:
+• A hierarchical deterministic finite-state automaton-based system, MATA, that unifies neurosymbolic framework with collaborative and competitive multi-agent design for visual reasoning.
+• Proposing (i) a learnable mechanism that trains a hyper agent as the transition policy of the hyper
+automaton over collaborative and competitive agents; (ii) a transition-trajectory data generation
+pipeline and the dataset, MATA-SFT-90K, for supervised finetuning (SFT) of the hyper agent.
+• Comprehensive experiments across visual-reasoning benchmarks, with extensive ablations and
+analysis.
+
+2
+
+R ELATED W ORKS
+
+Monolithic vision-language models (VLM) map images and text directly to answers with a single forward pass (Xiao et al., 2024; Liu et al., 2023b; Li et al., 2023a;b; Wu et al., 2023; Stanić
+et al., 2024; Zhu et al., 2023). While these models have strong perceptual capabilities, their implicit
+reasoning processes are hard to explain and often degrade on queries requiring spatial relations,
+counting, or multi-step reasoning (Jahangard et al., 2024; 2025). This motivates modular designs
+that expose intermediate, explainable symbolic processes (Andreas et al., 2016; Hsu et al., 2023).
+Compositional methods decompose a task into multiple stages (Ke et al., 2025b), often by having an
+LLM generate grounded actions (e.g., programs or JSON) executed by tools (Gupta & Kembhavi,
+2023; Surís et al., 2023; Shen et al., 2023; Lu et al., 2023). These pipelines improve interpretability
+and enable external tools use, but usually operate in a single forward pass with a fixed manually
+designed pipeline. They thus lack a flexible mechanism to engage in multi-step reasoning from
+feedback.
+Recent works (You et al., 2023; Ke et al., 2024; Gao et al., 2024; Zhong et al., 2025) explore agentic
+systems where an LLM/VLM reasons in multiple steps and calls tools (Ke et al., 2025b). However,
+most agentic approaches in visual reasoning remain single-agent. In broader domains, multi-agent
+frameworks assign disjoint roles and connect them with hand-crafted collaboration patterns (Hong
+et al., 2023; Li et al., 2024; Nguyen et al., 2025; Zhang et al., 2025), achieving better performance
+in reasoning. However, this idea is still under-explored for visual reasoning. Notably, noise from
+perception and LLM/VLM hallucinations can accumulate across steps (Ke et al., 2025a) from the
+collaborating pipelines, and most designs overlook competition between functionally overlapping
+agents (Wang et al., 2025c). This lack of a learned transition policy limits flexibility and robustness
+on complex and diverse queries.
+Finite-state automata as abstractions provide explicit control flow and interpretability. NAVER introduces probabilistic logic inside an automaton and equips modules with self-correction (Cai et al.,
+2025), but relies on a hand-crafted transition policy that is hard to manually define as states grow.
+HYDRA introduces an agent that includes a planner, an RL controller, and a code-executing reasoner (Ke et al., 2024). While data-driven, it still focuses on instruction-level planning without a
+learned, high-level policy for switching across qualitatively different agents on demand. By contrast,
+we propose MATA that explicitly learns the inter-agent transition function over a hyper-automaton
+whose states are agents, while keeping intra-agent micro-steps rule-based. This learned transition
+function enables collaboration and competition among overlapping experts and transfers across different domains and tasks (section 4.2), which previous visual reasoning methods with hand-written
+transitions or single-agent controllers do not address. States are agents; each agent runs a small,
+rule-based sub-automaton for reliable micro-control, while a trainable hyper agent learns cross-agent
+transitions over a shared memory. This hierarchical view retains the interpretability of explicit state
+machines, avoids hand-coded transitions, and supports both collaboration and competition. Unlike
+prior work (Ke et al., 2024; Cai et al., 2025), our controller is supervised-trained from transitiontrajectory data to transit between agents and to report a final result only when it is certain of the
+answer, directly addressing the gap identified above.
+3
+
+Published as a conference paper at ICLR 2026
+
+Hyper Automaton (Agents)
+
+Stepwise Reasoner
+Success
+Error
+
+Transition
+
+Policy
+
+Hyper
+
+
+Error
+Success
+
+Success
+
+Stepwise
+
+
+Agent
+
+Success
+
+Reasoner
+
+Fail to 
+
+
+GenerateInstruction
+
+
+Instruction
+
+
+Generator
+
+Hyper Agent
+
+Not Valid
+
+Fail to 
+
+
+Code
+
+
+Code
+
+
+Code
+
+
+Generator
+
+Verifier
+
+Interpreter
+
+Generate
+
+Verifier
+
+Success
+
+Fail to Generate
+
+Success
+
+Specialized
+
+Format
+
+Memory
+
+
+LLM State
+
+
+Prompter
+
+Controller
+
+Error
+
+Shared Memory
+
+Return
+
+Success
+
+Transition
+
+
+Agent
+
+Target
+
+Oneshot
+
+Reasoner
+
+Read/write by all agents
+
+Verifier
+Perception Results
+
+
+
+Normal Transition
+
+Specialized Agent
+
+Oneshot Reasoner
+
+Program History
+
+
+
+Success
+
+Trainable Transition
+
+Error
+
+Error Correction
+
+Success
+
+Success
+
+Not Valid
+
+Expert
+
+
+Prediction
+
+
+Model
+
+Verifier
+
+Initial
+
+Verifier Feedbacks
+
+
+Task Metadata
+
+Failure
+Fail to 
+
+
+Not Valid
+
+Code
+
+
+Code
+
+
+Code
+
+
+Generator
+
+Verifier
+
+Interpreter
+
+Generate
+
+Figure 2: Pipeline of MATA. A trainable hyper agent reads a snapshot of the shared memory, predicts the next state with an LLM State Controller. Its decision (blue arrows) routes control among
+agent states in the hyper automaton: Oneshot Reasoner, Stepwise Reasoner, and Specialized Agent.
+Each agent runs a rule-based sub-automaton that iterates until return to the hyper automaton. All
+agents read/write an append-only Shared Memory, enabling the hyper agent to access the current
+context for choosing the optimal next state. Lifecycle states I NITIAL and FAILURE are shown outside the agents (see subsection 3.2 for details).
+
+3
+
+M ETHODOLOGY
+
+We explore multi-agent visual reasoning by learning a high-level transition function over agents
+within a hierarchical automaton, enabling data-driven collaboration and competition among overlapping skills and replacing inflexible hand-written pipelines.
+3.1
+
+OVERVIEW
+
+A visual reasoning instance is an image-query pair (v, q) mapped to an output y (Ke et al., 2025b).
+MATA organizes inference as a hierarchical automaton operated by a trainable hyper-agent. Informally, the hyper automaton Mθ is a top-level automaton whose states include a set of sub-agents,
+with each sub-agent running a small rule-based sub-automaton, and the trainable hyper agent controlling the learned transition δθ . Formally, it can be described as a Mealy machine (Mealy, 1955):
+Mθ = (S, S0 , Σ, Λ, δθ , Γ) where S denotes the set of states (containing both agent states for task
+execution and lifecycle states for process coordination), S0 the initial state where reasoning begins,
+Σ the inputs drawn from shared-memory snapshots (storing intermediate results from agents), Λ
+the answer space of visual reasoning queries (e.g., discrete labels, bounding box coordinates, or
+free-text responses), δθ the learned transition function that determines the next state based on the
+current state and memory inputs, and Γ the output function that generates the final answer ŷ once
+the automaton reaches a terminal state. Detailed breakdowns of the states, transition mechanics, and
+output generation process are provided in the subsequent sections (Figure 2).
+3.2
+
+H YPER AUTOMATON
+
+States. The finite state set is the union of agent states and lifecycle states: S = Sagent ∪ Slife ,
+where Sagent = {O NESHOT, S TEPWISE, S PECIALIZED}, Slife = {I NITIAL, F INAL, FAILURE} and
+the initial state S0 = I NITIAL. Agent states invoke concrete skills; lifecycle states orchestrate the
+progression and termination of the reasoning episode (e.g., starting the task, handling uncertainty,
+concluding with an answer). Details of the states are shown in Table 1.
+Agents in our system are intentionally both collaborative and competitive. When control transitions
+from one agent to another, the successor agent reads the shared memory containing the prior history
+and feedback, and builds on that context; this is collaboration. At the same time, multiple agents
+may attempt the same task; if one agent stalls or fails, another can take over and complete it; this is
+competition. The learned transition policy δθ selects among them based on context (e.g., O NESHOT
+4
+
+Published as a conference paper at ICLR 2026
+
+Table 1: States of the hyper automaton. The table specifies the description and the triggering
+condition for each state. δθ : transition function of hyper automaton.
+State
+
+Description
+
+Selected by
+
+I NITIAL
+O NESHOT
+
+The unique state where reasoning begins.
+A workflow agent that executes a single-pass program generation and execution workflow for solvable queries, equipped with a lightweight verifier.
+A stepwise reasoner that produces step-wise Python programs for complex
+queries; code is verified and executed in a sandboxed environment to ensure
+correctness.
+An expert agent that performs fast perception tasks; built-in verifiers validate outputs and adapt parameters.
+A terminal state in which sufficient evidence has accumulated; the output
+function Γ is invoked when in this state to produce the final answer ŷ.
+A state triggered by unrecoverable errors or exceeding iteration limit.
+
+Initial state
+
+S TEPWISE
+S PECIALIZED
+F INAL
+FAILURE
+
+δθ
+
+Error occurs
+
+vs. S TEPWISE for moderately compositional VQA; S PECIALIZED vs. O NESHOT for grounding with
+simple perception). This overlap is intentional, as the three agents represent a spectrum: perception
+(system 1), one-shot reasoning (fast thinking), and stepwise reasoning (slow thinking). Although
+all agents can answer all queries, each agent has different advantages and disadvantages, enabling
+hyper agent to choose the optimal transition and re-route on failure. The implementation details of
+agents are shown in the supplementary material (Appendix B).
+Shared Memory. All agents read from and write to a structured shared memory mt at the t-th step
+that accumulates intermediate variables, perception results, program history, verifier feedback, and
+task metadata. We keep the formalism minimal: when an agent runs for one cycle, it appends its
+new memory ∆mt , and mt+1 = mt ∪ ∆mt . Memory is append-only so the full reasoning process
+is auditable and visible to the hyper agent.
+Execution Step. At step t the system is in (st , mt ). The hyper-agent observes the memory mt
+and selects the next state st+1 via the learned transition function δθ :
+st+1 = δθ (st , mt ), st+1 ∈ S.
+
+(1)
+
+If st+1 ∈ Sagent , the corresponding agent executes its rule-based sub-automaton until returning to
+the hyper automaton and updating the memory; if st+1 = F INAL or t > T where T is the max step
+limit, the episode terminates.
+Output. The answer space Λ contains the required output ŷ for visual reasoning. For example,
+Λ = {y | y is text for VQA, bounding box for VG, etc}. The output function Γ extracts the output
+from the memory mt at F INAL state: ŷ = Γ(F INAL, mt ).
+3.3
+
+T RAINABLE T RANSITION F UNCTION (H YPER AGENT )
+
+The transition function δθ in Equation 1 is implemented by a trainable LLM-based hyper agent Fθ .
+This agent acts as the state-transition controller, selecting the next state st+1 from a limited set of
+available candidate states. Since the LLM requires textual input, we derive a prompt xt from the
+shared memory mt . The template for constructing xt from mt is shown below:
+Prompt 3.1: LLM State Controller in Hyper Agent
+You are an AI assistant to control the state of a multi-step visual reasoning system. Your task is to decide
+the next state the system should transition to based on the current state and history.
+<TaskDescription>{task_title}{task_description}</TaskDescription>
+<Query>{query}</Query>
+<Feedback>{feedback}</Feedback>
+<Code>{code}</Code>
+<Variables>{variables}</Variables>
+<StateHistory>{state_history}</StateHistory>
+
+5
+
+Published as a conference paper at ICLR 2026
+
+<State>{state}</State>
+<CurrentStep>{current_step}</CurrentStep>
+Based on the information above, determine the next state the system should transition to. Choose from the
+following states:
+<StateCandidates>{next_state_candidates}</StateCandidates>
+Return the name wrapped in <NextState> tags.
+
+Our hyper agent Fθ maps the prompt xt to a distribution over the available states, from which st+1
+is selected, either through greedy decoding or stochastic sampling.
+The parameter θ of the hyper agent is supervised finetuned (SFT) on our collected transition trajectory dataset D (subsection 3.4). Each training example provides a textual memory xt as prompt
+and a target next state chosen by scanning branches in the trajectory tree that lead to successful and
+higher final scores:
+θ ← arg min LSFT (θ; D)
+(2)
+θ
+
+This objective guides the hyper agent on how to switch between sub-agents, and finalize the output.
+3.4
+
+DATASET G ENERATION
+
+Learning the transition policy of the hyper automaton requires examples of how agent states interact
+during visual reasoning. We therefore build a dataset of transition trajectories. We regard the set of
+possible transition trajectories from an initial state as a trajectory tree T (v, q) (Kearns et al., 2002)
+that records, for each node: the state history, intermediate reasoning outcomes, and final metric
+scores, as a textual prompt xt based on prompt 3.1. We collect this data by running MATA while
+systematically traversing each next-state option rather than committing to a single path. Unlike endto-end LLM/VLM training, this procedure explicitly explores the space of possible agent states and
+yields labeled decisions for our model.
+Concretely, we sample images and queries from the training splits of GQA (Hudson & Manning,
+2019), OK-VQA (Marino et al., 2019), and RefCOCO/RefCOCO+/RefCOCOg (Kazemzadeh et al.,
+2014) and run the hyper automaton Mθ step-wise. Rather than limiting to a single route, we expand
+a bounded trajectory tree to depth T : at each node (state) the controller branches over the possible
+next states st+1 ∈ S, executes the corresponding sub-automaton, and saves a memory checkpoint
+mt+1 . When a terminal state is reached (e.g., F INAL), which by construction corresponds to a leaf
+of the tree T , the output function Γ produces a prediction ŷ for the given image-query pair (v, q)
+with ground truth y. We then compute a scalar task score for that leaf: for VG we use IoU(ŷ, y);
+for VQA we use Acc(ŷ, y). During data collection we perform a near-exhaustive expansion of the
+transition tree to a fixed depth, which is tractable with the current three agents but, we acknowledge,
+grows rapidly as more agents/states are added.
+Bottom-up node scoring. As a result, each leaf node s ∈ Leaves(T ) is associated with a prediction ŷs and ground truth y, from which we compute a scalar score. We assign values to all nodes by
+propagating these scores upward from the leaves:
+
+metric(ŷs , y),
+s ∈ Leaves(T ),
+V (s) ≜
+(3)
+maxs′ ∈Child(s) V (s′ ), otherwise.
+To train the LLM state controller, we convert each multi-choice transition into supervised examples.
+For every decision point at state st with corresponding textual prompt xt , we determine the optimal
+next state s⋆t by selecting the child node that leads to the subtree with the highest propagated value.
+Formally, for a state st with its set of next states Child(st ) ⊆ S, we choose:
+s⋆t ∈ arg
+
+max
+s∈Child(st )
+
+V (s).
+
+(4)
+
+The chosen state s⋆t becomes the label for the corresponding node prompt xt , and together they form
+a training example. Repeating this over all decision points produces a dataset of message histories
+paired with optimal next states, D = {(xi , s⋆i )}N
+i=1 . Finally, we reformat the collected examples
+into instruction-completion pairs suitable for supervised finetuning of LLM. Training on this dataset
+enables the model to learn how to control the transitions of a hyper automaton. In total, we build
+6
+
+Published as a conference paper at ICLR 2026
+
+the SFT dataset MATA-SFT-90K containing N = 90,854 examples. We show the data example in
+Appendix H.
+3.5
+
+I NFERENCE
+
+Given an image-query pair (v, q), we initialize the shared memory m0 and enter the initial state
+s0 = I NITIAL. At step t, the hyper agent Fθ reads the current context xt and selects the next
+state st+1 using the learned transition in Equation 1. If st+1 ∈ Sagent , the corresponding sub-agent
+executes one cycle of its rule-based sub-automaton, appends its intermediate result to memory, and
+returns to the hyper automaton. If st+1 = FAILURE, this state indicates that the selected agent st
+reports an unrecoverable error and the system will invoke the hyper agent to choose a new state st+1
+while temporarily removing the failed agent st from the state candidates to avoid infinite retries. If
+st+1 = F INAL or the step t exceeds the limit T , the system terminates and returns the final result ŷ.
+
+4
+
+E XPERIMENTS AND R ESULTS
+
+Implementation Details. We implement MATA in PyTorch (Paszke et al., 2019) and conduct all
+experiments on 4 RTX 4090 GPUs. The system uses interchangeable foundation models; unless
+otherwise stated we adopt InternVL2.5 (8B) (Chen et al., 2025) as the VLM, Florence2-L (Xiao
+et al., 2024) for object detection, DepthAnythingV2 (Yang et al., 2024) for depth, and a Qwen3
+(4B) (Yang et al., 2025) LLM for the trainable state controller in the hyper agent. The LLM is
+supervised finetuned on MATA-SFT-90K using AdamW, cosine decay with 5% warm-up, global
+batch size 64, for 8 epochs; decoding is guided at inference to ensure the output format. As MATASFT-90K is a dataset collected by running our pipeline on multiple source datasets, “training on
+dataset X" means training on the subset of MATA-SFT-90K whose trajectories were generated from
+the training split of X. We use three SFT configurations for the hyper agent: (i) domain-specific:
+trained on the training split of the target dataset and evaluated on its test split; (ii) domain-transfer1 :
+trained on the dataset which is not the target dataset for evaluation; and (iii) general: trained jointly
+on the whole dataset. We follow the official splits of all the benchmark datasets, reporting accuracy.
+For fairness, when comparing with compositional baselines we keep the same foundation models,
+and for monolithic models we use the available public checkpoints with their official code. In the
+inference, we limit the max step of MATA T = 15 to avoid infinite running. The prompt template
+is shown in the Appendix G in supplementary material.
+Evaluation Protocol. We evaluate on GQA (Hudson & Manning, 2019), OK-VQA (Marino et al.,
+2019), RefCOCO/RefCOCO+/RefCOCOg (Kazemzadeh et al., 2014), and Ref-Adv (Akula et al.,
+2020) following the previous works (Surís et al., 2023; Ke et al., 2024; Cai et al., 2025), with
+accuracy as the metric. We compare against the previous compositional methods which are trainingrequired (Khan et al., 2024; Ke et al., 2025a) or training-free (Surís et al., 2023; Ke et al., 2024; Cai
+et al., 2025), and monolithic methods (Li et al., 2023b; Zhu et al., 2023; Liu et al., 2023a; Su et al.,
+2023; Han et al., 2023; Dai et al., 2023; Li et al., 2023a; Wang et al., 2024; Bai et al., 2025b; Chen
+et al., 2025; Zhu et al., 2025; Wang et al., 2025b; OpenAI, 2024; Tiong et al., 2022; Yang et al.,
+2022; Alayrac et al., 2022).
+4.1
+
+Q UANTITATIVE R ESULTS
+
+Compositional Image Question Answering. On GQA (Hudson & Manning, 2019), which emphasizes complex compositional reasoning over spatial relations and attributes, MATA reaches
+64.9% accuracy (Table 2), surpassing previous trainable compositional methods HYDRA and VisRep, training-free baselines such as ViperGPT. It is also competitive with strong monolithic VLMs,
+exceeding InternVL3.5 and Qwen2.5-VL. The gains stem from the learned transition policy, and
+the hyper agent understands the capacity of agents. Easy queries invoke S PECIALIZED perception
+first and escalate to O NESHOT or S TEPWISE only on failure or low confidence, whereas difficult
+cases route directly to S TEPWISE to maximize the reasoning. When the range of data is narrow
+and distinctive, the domain-specific setting can calibrate priors more precisely; when compositional
+1
+Our domain-transfer term is scoped to the hyper agent: it is trained on non-test-dataset transition trajectories, and never sees the optimal trajectories in other datasets.
+
+7
+
+Published as a conference paper at ICLR 2026
+
+Acc.
+45.5
+30.8
+41.3
+41.6
+41.2
+49.5
+50.0
+34.3
+62.4
+51.6
+61.5
+62.4
+63.8
+58.5
+
+IdealGPT (You et al., 2023)
+ViperGPT (Surís et al., 2023)
+VisRep (Khan et al., 2024)
+HYDRA (Ke et al., 2024)
+MATA (Ours) (General)
+MATA (Ours) (Domain-Specific)
+
+41.7
+37.9
+51.4
+52.8
+64.9
+64.7
+
+Monolithic
+
+Method
+BLIP-2 (Li et al., 2023b)
+MiniGPT-4 (13B) (Zhu et al., 2023)
+LLaVA (13B) (Liu et al., 2023a)
+PandaGPT (13B) (Su et al., 2023)
+ImageBind-LLM (7B) (Han et al., 2023)
+InstructBLIP (13B) (Dai et al., 2023)
+Otter (7B) (Li et al., 2023a)
+Qwen2-VL (7B) (Wang et al., 2024)
+Qwen2.5-VL (7B) (Bai et al., 2025b)
+Qwen3-VL (4B) (Bai et al., 2025a)
+InternVL2.5 (8B) (Chen et al., 2025)
+InternVL3 (8B) (Zhu et al., 2025)
+InternVL3.5 (8B) (Wang et al., 2025b)
+GPT-4o-2024-05-13 (OpenAI, 2024)
+
+Method
+PNP-VQA (Tiong et al., 2022)
+PICa (Yang et al., 2022)
+BLIP-2 (Li et al., 2023b)
+Flamingo (9B) (Alayrac et al., 2022)
+MiniGPT-4 (13B) (Zhu et al., 2023)
+LLaVA (13B) (Liu et al., 2023a)
+InstructBLIP (13B) (Dai et al., 2023)
+Qwen2-VL (7B) (Wang et al., 2024)
+Qwen2.5-VL (7B) (Bai et al., 2025b)
+Qwen3-VL (4B) (Bai et al., 2025a)
+InternVL2.5 (8B) (Chen et al., 2025)
+InternVL3 (8B) (Zhu et al., 2025)
+InternVL3.5 (8B) (Wang et al., 2025b)
+GPT-4o-2024-05-13 (OpenAI, 2024)
+
+Acc.
+35.9
+43.3
+45.9
+44.7
+37.5
+42.5
+47.9
+28.3
+71.8
+44.4
+75.2
+74.7
+75.7
+33.4
+
+Compositional
+
+Monolithic
+
+Type
+
+Table 3: Performance on OK-VQA dataset.
+
+Compositional
+
+Table 2: Performance on GQA dataset.
+
+Type
+
+IdealGPT (You et al., 2023)
+ViperGPT (Surís et al., 2023)
+VisRep (Khan et al., 2024)
+HYDRA (Ke et al., 2024)
+DWIM (Ke et al., 2025a)
+MATA (Ours) (General)
+MATA (Ours) (Domain-Specific)
+
+19.4
+40.7
+46.7
+59.4
+62.8
+76.0
+76.5
+
+Agentic types: non-agentic/non-specified;
+
+single-agent;
+
+multi-agent.
+
+Table 4: Quantitative comparison (accuracy) on referring expression comprehension task on
+RefCOCO, RefCOCO+, RefCOCOg (Kazemzadeh et al., 2014) and Ref-Adv (Akula et al., 2020)
+set. Note there is no training set in Ref-Adv, so all scores are domain-transfer.
+
+Compositional
+
+Monolithic
+
+Type
+
+Method
+RefCOCO RefCOCO+ RefCOCOg
+GLIP-L (Li et al., 2022)
+55.0
+51.1
+54.6
+KOSMOS-2 (Peng et al., 2023)
+57.4
+50.7
+61.7
+YOLO-World-X (Cheng et al., 2024)
+12.1
+12.1
+32.9
+YOLO-World-V2-X (Cheng et al., 2024)
+19.8
+16.8
+36.5
+GroundingDINO-T (Liu et al., 2023b)
+61.6
+59.7
+60.6
+GroundingDINO-B (Liu et al., 2023b)
+90.8
+84.6
+80.3
+SimVG (Dai et al., 2024)
+94.9
+91.0
+88.9
+Florence2-B (Xiao et al., 2024)
+94.5
+91.2
+88.3
+Florence2-L (Xiao et al., 2024)
+95.1
+92.5
+90.9
+GPT-4o-2024-05-13 (OpenAI, 2024)
+30.5
+26.2
+Qwen2.5-VL-72B (Bai et al., 2025b)
+94.6
+92.2
+90.3
+Code-bison (Stanić et al., 2024)
+44.4
+38.2
+ViperGPT (Surís et al., 2023)
+68.6
+73.8
+68.7
+VisRep (Khan et al., 2024)
+55.2
+51.1
+HYDRA (Ke et al., 2024)
+65.7
+66.2
+59.9
+DWIM (Ke et al., 2025a)
+82.7
+74.2
+NAVER (Cai et al., 2025)
+96.2
+92.8
+91.6
+MATA (Ours) (General)
+96.3
+93.8
+90.7
+MATA (Ours) (Domain-Specific)
+96.3
+93.9
+90.8
+Agentic types: non-agentic/non-specified; single-agent;
+multi-agent.
+
+Ref-Adv
+55.7
+32.2
+33.1
+60.5
+78.0
+74.4
+72.2
+71.8
+58.2
+48.3
+75.4
+77.3
+-
+
+patterns are shared across sources, joint training (general) regularizes transitions and reduces overfitting. In GQA we observe the latter, many patterns appear across sources in MATA-SFT-90K, so
+the general setting achieves better performance.
+External Knowledge-Dependent Image Question Answering. On OK-VQA (Marino et al.,
+2019), which requires external knowledge, MATA achieves 76.5% accuracy (Table 3), surpassing prior compositional systems such as DWIM (62.8%) and HYDRA (59.4%), respectively, and
+outperforming recent monolithic VLMs including Qwen2.5-VL (71.8%) and InternVL3.5 (75.7%).
+Gains come from the learned hyper agent transition: for easy queries the hyper agent first invokes
+S PECIALIZED perception and escalates to the S TEPWISE or O NESHOT reasoner only on failure or
+8
+
+Published as a conference paper at ICLR 2026
+
+Table 5: Ablation of hyper agent. In this table, we report the accuracy for all VQA and referring expression comprehension benchmarks, and the inference time per query (tested on GQA). HA: Hyper
+Automaton. Transition: Transition policy (δθ ). SFT: Supervised finetuning. Refer to subsection 4.2
+for details.
+HA
+✗
+✓
+✓
+✓
+
+Components
+Transition SFT
+Exhaustive
+✗
+Random
+✗
+LLM
+✗
+LLM
+✓
+
+GQA
+57.7
+57.1
+58.5
+64.9
+
+OK-VQA
+71.5
+71.1
+75.1
+76.5
+
+Accuracy (↑)
+RefCOCO RefCOCO+
+87.7
+85.6
+85.3
+83.8
+95.8
+93.5
+96.3
+93.9
+
+RefCOCOg
+81.7
+81.1
+88.0
+90.8
+
+Ref-Adv
+73.1
+73.2
+76.0
+77.3
+
+Time (↓)
+Avg Sec.
+34.58
+6.91
+8.07
+8.01
+
+Table 6: Generalizability results. The top-left header cell uses a diagonal split to indicate Training
+Data (rows, ↓) versus Test Data (columns, →). Diagonal values (domain-specific) train and test on
+the same dataset; off-diagonal values evaluate cross-domain/task transfer (domain-transfer) . The
+last row reports joint training on the whole MATA-SFT-90K dataset (general) . Off-diagonal values
+are close to the diagonal ones, indicating strong generalizability of the learned transition policy.
+Test
+Training
+GQA
+OK-VQA
+RefCOCO
+RefCOCO+
+RefCOCOg
+All
+
+GQA
+64.7
+64.1
+63.8
+63.6
+63.1
+64.9
+
+VQA
+OK-VQA
+75.8
+76.5
+75.5
+75.4
+75.4
+76.0
+
+RefCOCO
+96.1
+96.2
+96.3
+96.2
+96.1
+96.3
+
+Visual Grounding
+RefCOCO+ RefCOCOg
+93.7
+90.4
+93.8
+90.5
+93.9
+90.8
+93.9
+90.7
+93.7
+90.8
+93.8
+90.7
+
+Ref-Adv
+77.0
+76.9
+77.2
+77.1
+77.2
+77.3
+
+low confidence; for difficult queries it directly selects S TEPWISE for multi-step reasoning, with competitive re-entry into S PECIALIZED or O NESHOT to reason combining the previous findings and new
+evidence. We observe the domain-specific setting holds a small edge, likely because of the narrow
+diversity of the reasoning pattern required in the dataset, whereas joint training (general) slightly
+dilutes these knowledge.
+Referring Expression Comprehension. On popular benchmarks RefCOCO, RefCOCO+, RefCOCOg (Kazemzadeh et al., 2014) and Ref-Adv (Akula et al., 2020), MATA obtains state-of-the-art
+performance (Table 4). It sets a new state-of-the-art on these datasets, exceeding strong monolithic and compositional baselines. Notably, Ref-Adv only contains a test set, which means the
+MATA-SFT-90K does not contain the data collected from it, showing promising domain-transfer
+generalizability of MATA. Note that due to learned transition, short simple queries are solved by
+S PECIALIZED perception with verification, while complex cases trigger S TEPWISE and O NESHOT
+reasoning. Domain-specific SFT is slightly stronger because the language query styles is datasetspecific.
+4.2
+
+A BLATION S TUDIES
+
+Hyper Agent. Table 5 isolates the main contribution of the trainable hyper agent and the hierarchical automaton design. We compare: (1) Exhaustive Ensemble without hierarchical automaton
+(HA): exhaustively call all sub-agents and aggregate with a VLM; (2) Random Transition: HA
+enabled but the next state is chosen randomly; (3) LLM without SFT: a pretrained LLM is used as
+the state controller (no supervised finetuning); (4) LLM + SFT: a supervised finetuned LLM controls transitions. Both the exhaustive baseline and random transition yield the weakest performance,
+but introducing the hyper automaton already cuts runtime significantly. Replacing random with a
+pretrained LLM in hyper agent improves accuracy across tasks. This suggests that (i) the hyper
+automaton and the LLM primarily drive effective multi-agent collaboration and competition and (ii)
+SFT further helps the understanding of the capacity of agents in different types of questions.
+9
+
+Published as a conference paper at ICLR 2026
+
+Figure 3: Results of different LLM sizes. Accuracy versus the
+model size (in billions of parameters) of the hyper agent’s LLM
+state controller. Left: GQA; right: OK-VQA. X-axis: LLM
+size; Y-axis: accuracy.
+
+Figure 4: Results of different
+numbers of sub-agents. Xaxis: number of sub-agents; Yaxis: accuracy in GQA.
+
+Generalizability. We conduct generalization analysis by training the hyper agent on GQA subset
+only of MATA-SFT-90K dataset, OK-VQA subset only, or the whole dataset. Table 6 organizes results by different training/evaluation types: domain-specific, domain-transfer, and general. domaintransfer performance is strong in both directions (GQA→OK-VQA; OK-VQA→GQA) with less
+than 1% difference. The model trained on all data reaches similar performance to the model trained
+on the corresponding subset only, indicating the controller learns a task-agnostic transition policy
+with minimal negative impact. We further discuss the effects in the next paragraph.
+LLM Size. Figure 3 compares the sizes of the LLM state controller from 0.6B to 8B under three
+settings: (i) no SFT, (ii) domain-specific SFT, and (iii) SFT on all. With domain-specific SFT, even
+small models (0.6B/1.7B) perform competitively matching 4B and 8B. When finetuned jointly on all
+data, small models are worse than 4B/8B by a few percentage points, indicating limited capacity to
+absorb cross-task knowledge. Without SFT, accuracy drops sharply for smaller models and improves
+mainly with size. Balancing accuracy and efficiency, we choose 4B as default, as it produces nearoptimal results with substantially lower memory, while larger models yielding only marginal gains.
+Number of Agents. We ablate the number of agent states to quantify benefits beyond our 3-agent
+design. On GQA, a single Specialized agent reaches 61.5%, adding the Oneshot reasoner lifts accuracy to 64.5%, and adding the Stepwise reasoner yields a marginal further gain to 64.9% (Figure 4).
+The small improvement from 2 to 3 agents indicates diminishing improvements on current benchmarks, suggesting that the agent count is not the major factor. We therefore use three agents in
+MATA.
+More Analysis. We discuss more analysis for generalizability in Appendix C, hyper agent in Appendix D, efficiency in Appendix E, comparison with direct SFT in Appendix F, and the qualitative
+examples in Appendix I in supplementary materials.
+
+5
+
+C ONCLUSION
+
+We present MATA, a visual reasoning method that uses a trainable hyper agent to learn the transition
+policy of a hierarchical finite-state automaton. By transitioning between agents based on a shared
+memory, the system reduces hallucinations, and preserves explainability through explicit states and
+context. To supervise the hyper agent, we introduced the transition-trajectory dataset MATA-SFT90K, which converts the trajectory data into a standard SFT format and adapts as agents are added.
+From experiments, MATA achieves state-of-the-art performance across multiple datasets. Limitations. The data generation pipeline performs a near-exhaustive transition search over the state space;
+this is tractable with the current three agents but may become costly as the number of states grows.
+ACKNOWLEDGMENTS
+This research is sponsored by the DARPA Assured Neuro Symbolic Learning and Reasoning
+(ANSR) program under award number FA8750-23-2-1016.
+10
+
+Published as a conference paper at ICLR 2026
+
+R EFERENCES
+Arjun Akula, Spandana Gella, Yaser Al-Onaizan, Song-Chun Zhu, and Siva Reddy. Words Aren’t
+Enough, Their Order Matters: On the Robustness of Grounding Visual Referring Expressions.
+In Dan Jurafsky, Joyce Chai, Natalie Schluter, and Joel Tetreault (eds.), Proceedings of the 58th
+Annual Meeting of the Association for Computational Linguistics, pp. 6555–6565, Online, July
+2020. Association for Computational Linguistics. doi: 10.18653/v1/2020.acl-main.586. URL
+https://aclanthology.org/2020.acl-main.586/.
+Jean-Baptiste Alayrac, Jeff Donahue, Pauline Luc, Antoine Miech, Iain Barr, Yana Hasson, Karel
+Lenc, Arthur Mensch, Katherine Millican, Malcolm Reynolds, Roman Ring, Eliza Rutherford, Serkan Cabi, Tengda Han, Zhitao Gong, Sina Samangooei, Marianne Monteiro, Jacob L. Menick, Sebastian Borgeaud, Andy Brock, Aida Nematzadeh, Sahand Sharifzadeh,
+Mikołaj Bińkowski, Ricardo Barreira, Oriol Vinyals, Andrew Zisserman, and Karén Simonyan.
+Flamingo: a Visual Language Model for Few-Shot Learning. In Advances in Neural Information Processing Systems, volume 35, pp. 23716–23736. Curran Associates, Inc., December 2022. URL https://proceedings.neurips.cc/paper_files/paper/2022/
+hash/960a172bc7fbf0177ccccbb411a7d800-Abstract-Conference.html.
+Jacob Andreas, Marcus Rohrbach, Trevor Darrell, and Dan Klein. Neural Module Networks. In
+Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition, pp. 39–
+48, 2016. URL https://openaccess.thecvf.com/content_cvpr_2016/html/
+Andreas_Neural_Module_Networks_CVPR_2016_paper.html.
+Shuai Bai, Yuxuan Cai, Ruizhe Chen, Keqin Chen, Xionghui Chen, Zesen Cheng, Lianghao Deng,
+Wei Ding, Chang Gao, Chunjiang Ge, Wenbin Ge, Zhifang Guo, Qidong Huang, Jie Huang, Fei
+Huang, Binyuan Hui, Shutong Jiang, Zhaohai Li, Mingsheng Li, Mei Li, Kaixin Li, Zicheng Lin,
+Junyang Lin, Xuejing Liu, Jiawei Liu, Chenglong Liu, Yang Liu, Dayiheng Liu, Shixuan Liu,
+Dunjie Lu, Ruilin Luo, Chenxu Lv, Rui Men, Lingchen Meng, Xuancheng Ren, Xingzhang Ren,
+Sibo Song, Yuchong Sun, Jun Tang, Jianhong Tu, Jianqiang Wan, Peng Wang, Pengfei Wang, Qiuyue Wang, Yuxuan Wang, Tianbao Xie, Yiheng Xu, Haiyang Xu, Jin Xu, Zhibo Yang, Mingkun
+Yang, Jianxin Yang, An Yang, Bowen Yu, Fei Zhang, Hang Zhang, Xi Zhang, Bo Zheng, Humen
+Zhong, Jingren Zhou, Fan Zhou, Jing Zhou, Yuanzhi Zhu, and Ke Zhu. Qwen3-VL Technical Report, November 2025a. URL http://arxiv.org/abs/2511.21631. arXiv:2511.21631
+[cs].
+Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin Ge, Sibo Song, Kai Dang, Peng Wang,
+Shijie Wang, Jun Tang, Humen Zhong, Yuanzhi Zhu, Mingkun Yang, Zhaohai Li, Jianqiang Wan,
+Pengfei Wang, Wei Ding, Zheren Fu, Yiheng Xu, Jiabo Ye, Xi Zhang, Tianbao Xie, Zesen Cheng,
+Hang Zhang, Zhibo Yang, Haiyang Xu, and Junyang Lin. Qwen2.5-VL Technical Report, February 2025b. URL http://arxiv.org/abs/2502.13923. arXiv:2502.13923 [cs].
+Zhixi Cai, Fucai Ke, Simindokht Jahangard, Maria Garcia de la Banda, Reza Haffari, Peter J. Stuckey, and Hamid Rezatofighi. NAVER: A Neuro-Symbolic Compositional Automaton for Visual Grounding with Explicit Logic Reasoning.
+In Proceedings of the
+IEEE/CVF International Conference on Computer Vision, pp. 24078–24089, 2025. URL
+https://openaccess.thecvf.com/content/ICCV2025/html/Cai_NAVER_
+A_Neuro-Symbolic_Compositional_Automaton_for_Visual_Grounding_
+with_Explicit_ICCV_2025_paper.html.
+Zhe Chen, Jiannan Wu, Wenhai Wang, Weijie Su, Guo Chen, Sen Xing, Muyan Zhong, Qinglong Zhang, Xizhou Zhu, Lewei Lu, Bin Li, Ping Luo, Tong Lu, Yu Qiao, and Jifeng Dai.
+InternVL: Scaling up Vision Foundation Models and Aligning for Generic Visual-Linguistic
+Tasks. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 24185–24198, 2024. URL https://openaccess.thecvf.com/content/
+CVPR2024/html/Chen_InternVL_Scaling_up_Vision_Foundation_Models_
+and_Aligning_for_Generic_CVPR_2024_paper.html.
+Zhe Chen, Weiyun Wang, Yue Cao, Yangzhou Liu, Zhangwei Gao, Erfei Cui, Jinguo Zhu, Shenglong Ye, Hao Tian, Zhaoyang Liu, Lixin Gu, Xuehui Wang, Qingyun Li, Yimin Ren, Zixuan
+Chen, Jiapeng Luo, Jiahao Wang, Tan Jiang, Bo Wang, Conghui He, Botian Shi, Xingcheng
+11
+
+Published as a conference paper at ICLR 2026
+
+Zhang, Han Lv, Yi Wang, Wenqi Shao, Pei Chu, Zhongying Tu, Tong He, Zhiyong Wu, Huipeng
+Deng, Jiaye Ge, Kai Chen, Kaipeng Zhang, Limin Wang, Min Dou, Lewei Lu, Xizhou Zhu, Tong
+Lu, Dahua Lin, Yu Qiao, Jifeng Dai, and Wenhai Wang. Expanding Performance Boundaries of
+Open-Source Multimodal Models with Model, Data, and Test-Time Scaling, January 2025. URL
+http://arxiv.org/abs/2412.05271. arXiv:2412.05271 [cs].
+Tianheng Cheng, Lin Song, Yixiao Ge, Wenyu Liu, Xinggang Wang, and Ying Shan. YOLO-World:
+Real-Time Open-Vocabulary Object Detection. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 16901–16911, 2024. URL https:
+//openaccess.thecvf.com/content/CVPR2024/html/Cheng_YOLO-World_
+Real-Time_Open-Vocabulary_Object_Detection_CVPR_2024_paper.html.
+Ming Dai, Lingfeng Yang, Yihao Xu, Zhenhua Feng, and Wankou Yang.
+SimVG: A
+Simple Framework for Visual Grounding with Decoupled Multi-modal Fusion. In Advances in Neural Information Processing Systems, volume 37, pp. 121670–121698, December 2024. URL https://proceedings.neurips.cc/paper_files/paper/2024/
+hash/dc6319dde4fb182b22fb902da9418566-Abstract-Conference.html.
+Wenliang Dai, Junnan Li, Dongxu Li, Anthony Meng Huat Tiong, Junqi Zhao, Weisheng Wang,
+Boyang Li, Pascale Fung, and Steven Hoi. InstructBLIP: Towards General-purpose VisionLanguage Models with Instruction Tuning, June 2023. URL http://arxiv.org/abs/
+2305.06500. arXiv:2305.06500 [cs].
+Yufan Dang, Chen Qian, Xueheng Luo, Jingru Fan, Zihao Xie, Ruijie Shi, Weize Chen, Cheng
+Yang, Xiaoyin Che, Ye Tian, Xuantang Xiong, Lei Han, Zhiyuan Liu, and Maosong Sun. MultiAgent Collaboration via Evolving Orchestration, May 2025. URL http://arxiv.org/
+abs/2505.19591. arXiv:2505.19591 [cs].
+DeepSeek-AI. DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement
+Learning, January 2025. URL http://arxiv.org/abs/2501.12948. arXiv:2501.12948
+[cs].
+Zhi Gao, Yuntao Du, Xintong Zhang, Xiaojian Ma, Wenjuan Han, Song-Chun Zhu, and Qing
+Li. CLOVA: A Closed-LOop Visual Assistant with Tool Usage and Update. In Proceedings
+of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 13258–13268,
+2024. URL https://openaccess.thecvf.com/content/CVPR2024/html/Gao_
+CLOVA_A_Closed-LOop_Visual_Assistant_with_Tool_Usage_and_Update_
+CVPR_2024_paper.html.
+Gemini-Team. Gemini: A Family of Highly Capable Multimodal Models, December 2023. URL
+http://arxiv.org/abs/2312.11805. arXiv:2312.11805 [cs].
+Tanmay Gupta and Aniruddha Kembhavi. Visual Programming: Compositional Visual Reasoning
+Without Training. In Proceedings of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition, pp. 14953–14962, 2023. URL https://openaccess.thecvf.com/
+content/CVPR2023/html/Gupta_Visual_Programming_Compositional_
+Visual_Reasoning_Without_Training_CVPR_2023_paper.html.
+Jiaming Han, Renrui Zhang, Wenqi Shao, Peng Gao, Peng Xu, Han Xiao, Kaipeng Zhang, Chris
+Liu, Song Wen, Ziyu Guo, Xudong Lu, Shuai Ren, Yafei Wen, Xiaoxin Chen, Xiangyu Yue,
+Hongsheng Li, and Yu Qiao. ImageBind-LLM: Multi-modality Instruction Tuning, September
+2023. URL http://arxiv.org/abs/2309.03905. arXiv:2309.03905 [cs].
+Sirui Hong, Mingchen Zhuge, Jonathan Chen, Xiawu Zheng, Yuheng Cheng, Ceyao Zhang, Jinlin
+Wang, Zili Wang, Steven Ka Shing Yau, Zijuan Lin, Liyang Zhou, Chenyu Ran, Lingfeng Xiao,
+Chenglin Wu, and Jürgen Schmidhuber. MetaGPT: Meta Programming for A Multi-Agent Collaborative Framework. In The Twelfth International Conference on Learning Representations.
+arXiv, November 2023. doi: 10.48550/arXiv.2308.00352. URL https://openreview.
+net/forum?id=VtmBAGCN7o.
+Joy Hsu, Jiayuan Mao, Joshua B. Tenenbaum, and Jiajun Wu. What’s Left? concept grounding
+with logic-enhanced foundation models. In Proceedings of the 37th International Conference on
+12
+
+Published as a conference paper at ICLR 2026
+
+Neural Information Processing Systems, NIPS ’23, pp. 38798–38814, Red Hook, NY, USA, 2023.
+Curran Associates Inc.
+Drew A. Hudson and Christopher D. Manning. GQA: A New Dataset for Real-World Visual Reasoning and Compositional Question Answering. In Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition, pp. 6700–6709, 2019. URL
+https://openaccess.thecvf.com/content_CVPR_2019/html/Hudson_GQA_
+A_New_Dataset_for_Real-World_Visual_Reasoning_and_Compositional_
+CVPR_2019_paper.html.
+Simindokht Jahangard, Zhixi Cai, Shiki Wen, and Hamid Rezatofighi. JRDB-Social: A Multifaceted
+Robotic Dataset for Understanding of Context and Dynamics of Human Interactions Within Social
+Groups. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 22087–22097, 2024. URL https://openaccess.thecvf.com/content/
+CVPR2024/html/Jahangard_JRDB-Social_A_Multifaceted_Robotic_
+Dataset_for_Understanding_of_Context_and_CVPR_2024_paper.html.
+Simindokht Jahangard, Mehrzad Mohammadi, Yi Shen, Zhixi Cai, and Hamid Rezatofighi. JRDBReasoning: A Difficulty-Graded Benchmark for Visual Reasoning in Robotics, August 2025.
+URL http://arxiv.org/abs/2508.10287. arXiv:2508.10287 [cs].
+Sahar Kazemzadeh, Vicente Ordonez, Mark Matten, and Tamara Berg. ReferItGame: Referring to
+Objects in Photographs of Natural Scenes. In Alessandro Moschitti, Bo Pang, and Walter Daelemans (eds.), Proceedings of the 2014 Conference on Empirical Methods in Natural Language
+Processing (EMNLP), pp. 787–798, Doha, Qatar, October 2014. Association for Computational
+Linguistics. doi: 10.3115/v1/D14-1086. URL https://aclanthology.org/D14-1086.
+Fucai Ke, Zhixi Cai, Simindokht Jahangard, Weiqing Wang, Pari Delir Haghighi, and Hamid
+Rezatofighi. HYDRA: A Hyper Agent for Dynamic Compositional Visual Reasoning. In Aleš
+Leonardis, Elisa Ricci, Stefan Roth, Olga Russakovsky, Torsten Sattler, and Gül Varol (eds.),
+Computer Vision – ECCV 2024, pp. 132–149, Cham, 2024. Springer Nature Switzerland. ISBN
+978-3-031-72661-3. doi: 10.1007/978-3-031-72661-3_8.
+Fucai Ke, Vijay Kumar B. G, Xingjian Leng, Zhixi Cai, Zaid Khan, Weiqing Wang, Pari Delir
+Haghighi, Hamid Rezatofighi, and Manmohan Chandraker. DWIM: Towards Tool-aware
+Visual Reasoning via Discrepancy-aware Workflow Generation & Instruct-Masking Tuning. In
+Proceedings of the IEEE/CVF International Conference on Computer Vision, pp. 3378–3389,
+2025a. URL https://openaccess.thecvf.com/content/ICCV2025/html/Ke_
+DWIM_Towards_Tool-aware_Visual_Reasoning_via_Discrepancy-aware_
+Workflow_Generation__ICCV_2025_paper.html.
+Fucai Ke, Joy Hsu, Zhixi Cai, Zixian Ma, Xin Zheng, Xindi Wu, Sukai Huang, Weiqing Wang,
+Pari Delir Haghighi, Gholamreza Haffari, Ranjay Krishna, Jiajun Wu, and Hamid Rezatofighi.
+Explain Before You Answer: A Survey on Compositional Visual Reasoning, August 2025b. URL
+http://arxiv.org/abs/2508.17298. arXiv:2508.17298 [cs].
+Michael Kearns, Yishay Mansour, and Andrew Y. Ng. A Sparse Sampling Algorithm for NearOptimal Planning in Large Markov Decision Processes. Machine Learning, 49(2):193–208,
+November 2002. ISSN 1573-0565. doi: 10.1023/A:1017932429737. URL https://doi.
+org/10.1023/A:1017932429737.
+Zaid Khan, Vijay Kumar Bg, Samuel Schulter, Yun Fu, and Manmohan Chandraker. SelfTraining Large Language Models for Improved Visual Program Synthesis With Visual
+Reinforcement. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition, pp. 14344–14353, 2024.
+URL https://openaccess.thecvf.com/
+content/CVPR2024/html/Khan_Self-Training_Large_Language_Models_
+for_Improved_Visual_Program_Synthesis_With_CVPR_2024_paper.html.
+Ao Li, Yuexiang Xie, Songze Li, Fugee Tsung, Bolin Ding, and Yaliang Li. Agent-Oriented Planning in Multi-Agent Systems. In The Thirteenth International Conference on Learning Representations, October 2024. URL https://openreview.net/forum?id=EqcLAU6gyU.
+13
+
+Published as a conference paper at ICLR 2026
+
+Bo Li, Yuanhan Zhang, Liangyu Chen, Jinghao Wang, Jingkang Yang, and Ziwei Liu. Otter: A
+Multi-Modal Model with In-Context Instruction Tuning, May 2023a. URL http://arxiv.
+org/abs/2305.03726. arXiv:2305.03726 [cs].
+Junnan Li, Dongxu Li, Silvio Savarese, and Steven Hoi. BLIP-2: Bootstrapping LanguageImage Pre-training with Frozen Image Encoders and Large Language Models. In International Conference on Machine Learning, 2023b. doi: 10.48550/ARXIV.2301.12597. URL
+https://arxiv.org/abs/2301.12597.
+Liunian Harold Li, Pengchuan Zhang, Haotian Zhang, Jianwei Yang, Chunyuan Li,
+Yiwu Zhong, Lijuan Wang, Lu Yuan, Lei Zhang, Jenq-Neng Hwang, Kai-Wei Chang,
+and Jianfeng Gao.
+Grounded Language-Image Pre-Training.
+In Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 10965–10975,
+2022. URL https://openaccess.thecvf.com/content/CVPR2022/html/Li_
+Grounded_Language-Image_Pre-Training_CVPR_2022_paper.html.
+Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee. Visual Instruction Tuning, April
+2023a. URL http://arxiv.org/abs/2304.08485. arXiv:2304.08485 [cs].
+Shilong Liu, Zhaoyang Zeng, Tianhe Ren, Feng Li, Hao Zhang, Jie Yang, Chunyuan Li, Jianwei
+Yang, Hang Su, Jun Zhu, and Lei Zhang. Grounding DINO: Marrying DINO with Grounded
+Pre-Training for Open-Set Object Detection, March 2023b. URL http://arxiv.org/abs/
+2303.05499. arXiv:2303.05499 [cs].
+Pan Lu, Baolin Peng, Hao Cheng, Michel Galley, Kai-Wei Chang, Ying Nian Wu, Song-Chun
+Zhu, and Jianfeng Gao. Chameleon: Plug-and-Play Compositional Reasoning with Large Language Models. In Advances in Neural Information Processing Systems, volume 36, December 2023. URL https://proceedings.neurips.cc/paper_files/paper/2023/
+hash/871ed095b734818cfba48db6aeb25a62-Abstract-Conference.html.
+Kenneth Marino, Mohammad Rastegari, Ali Farhadi, and Roozbeh Mottaghi. OK-VQA: A
+Visual Question Answering Benchmark Requiring External Knowledge. In Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp. 3195–3204, 2019.
+URL https://openaccess.thecvf.com/content_CVPR_2019/html/Marino_
+OK-VQA_A_Visual_Question_Answering_Benchmark_Requiring_External_
+Knowledge_CVPR_2019_paper.html.
+George H. Mealy. A method for synthesizing sequential circuits. The Bell System Technical Journal,
+34(5):1045–1079, September 1955. ISSN 0005-8580. doi: 10.1002/j.1538-7305.1955.tb03788.x.
+URL https://ieeexplore.ieee.org/abstract/document/6771467.
+Thang Nguyen, Peter Chin, and Yu-Wing Tai. MA-RAG: Multi-Agent Retrieval-Augmented Generation via Collaborative Chain-of-Thought Reasoning, May 2025. URL http://arxiv.org/
+abs/2505.20096. arXiv:2505.20096 [cs].
+OpenAI. GPT-4o System Card, October 2024. URL http://arxiv.org/abs/2410.21276.
+Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer, James Bradbury, Gregory Chanan, Trevor
+Killeen, Zeming Lin, Natalia Gimelshein, Luca Antiga, Alban Desmaison, Andreas Kopf, Edward
+Yang, Zachary DeVito, Martin Raison, Alykhan Tejani, Sasank Chilamkurthy, Benoit Steiner,
+Lu Fang, Junjie Bai, and Soumith Chintala. PyTorch: An Imperative Style, High-Performance
+Deep Learning Library. In Advances in Neural Information Processing Systems, volume 32. Curran Associates, Inc., 2019. URL https://proceedings.neurips.cc/paper/2019/
+hash/bdbca288fee7f92f2bfa9f7012727740-Abstract.html.
+Zhiliang Peng, Wenhui Wang, Li Dong, Yaru Hao, Shaohan Huang, Shuming Ma, and Furu Wei.
+Kosmos-2: Grounding Multimodal Large Language Models to the World, July 2023. URL http:
+//arxiv.org/abs/2306.14824. arXiv:2306.14824 [cs].
+Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell, Pamela Mishkin, Jack Clark, Gretchen Krueger, and Ilya
+Sutskever. Learning Transferable Visual Models From Natural Language Supervision. In Proceedings of the 38th International Conference on Machine Learning, pp. 8748–8763. PMLR, July
+2021. URL https://proceedings.mlr.press/v139/radford21a.html.
+14
+
+Published as a conference paper at ICLR 2026
+
+Yongliang Shen, Kaitao Song, Xu Tan, Dongsheng Li, Weiming Lu, and Yueting Zhuang. HuggingGPT: Solving AI Tasks with ChatGPT and its Friends in Hugging Face, March 2023. URL
+http://arxiv.org/abs/2303.17580. arXiv:2303.17580 [cs].
+Aleksandar Stanić, Sergi Caelles, and Michael Tschannen. Towards Truly Zero-shot Compositional Visual Reasoning with LLMs as Programmers. Transactions on Machine Learning Research, January 2024. ISSN 2835-8856. URL https://openreview.net/forum?id=
+WYGiqSVstK.
+Yixuan Su, Tian Lan, Huayang Li, Jialu Xu, Yan Wang, and Deng Cai. PandaGPT: One Model To
+Instruction-Follow Them All, May 2023. URL http://arxiv.org/abs/2305.16355.
+arXiv:2305.16355 [cs].
+Dídac Surís, Sachit Menon, and Carl Vondrick. ViperGPT: Visual Inference via Python Execution for Reasoning, March 2023. URL http://arxiv.org/abs/2303.08128.
+arXiv:2303.08128 [cs].
+Anthony Meng Huat Tiong, Junnan Li, Boyang Li, Silvio Savarese, and Steven C.H. Hoi. Plugand-Play VQA: Zero-shot VQA by Conjoining Large Pretrained Models with Zero Training. In
+Yoav Goldberg, Zornitsa Kozareva, and Yue Zhang (eds.), Findings of the Association for Computational Linguistics: EMNLP 2022, pp. 951–967, Abu Dhabi, United Arab Emirates, December 2022. Association for Computational Linguistics. doi: 10.18653/v1/2022.findings-emnlp.67.
+URL https://aclanthology.org/2022.findings-emnlp.67/.
+Ziyu Wan, Yunxiang Li, Xiaoyu Wen, Yan Song, Hanjing Wang, Linyi Yang, Mark Schmidt, Jun
+Wang, Weinan Zhang, Shuyue Hu, and Ying Wen. ReMA: Learning to Meta-think for LLMs with
+Multi-Agent Reinforcement Learning, May 2025. URL http://arxiv.org/abs/2503.
+09501. arXiv:2503.09501 [cs].
+Haotian Wang, Xiyuan Du, Weijiang Yu, Qianglong Chen, Kun Zhu, Zheng Chu, Lian Yan, and
+Yi Guan. Learning to break: Knowledge-enhanced reasoning in multi-agent debate system.
+Neurocomputing, 618:129063, February 2025a. ISSN 0925-2312. doi: 10.1016/j.neucom.
+2024.129063. URL https://www.sciencedirect.com/science/article/pii/
+S0925231224018344.
+Peng Wang, Shuai Bai, Sinan Tan, Shijie Wang, Zhihao Fan, Jinze Bai, Keqin Chen, Xuejing Liu,
+Jialin Wang, Wenbin Ge, Yang Fan, Kai Dang, Mengfei Du, Xuancheng Ren, Rui Men, Dayiheng
+Liu, Chang Zhou, Jingren Zhou, and Junyang Lin. Qwen2-VL: Enhancing Vision-Language
+Model’s Perception of the World at Any Resolution, October 2024. URL http://arxiv.
+org/abs/2409.12191. arXiv:2409.12191 [cs].
+Weiyun Wang, Zhangwei Gao, Lixin Gu, Hengjun Pu, Long Cui, Xingguang Wei, Zhaoyang
+Liu, Linglin Jing, Shenglong Ye, Jie Shao, Zhaokai Wang, Zhe Chen, Hongjie Zhang, Ganlin Yang, Haomin Wang, Qi Wei, Jinhui Yin, Wenhao Li, Erfei Cui, Guanzhou Chen, Zichen
+Ding, Changyao Tian, Zhenyu Wu, Jingjing Xie, Zehao Li, Bowen Yang, Yuchen Duan, Xuehui Wang, Zhi Hou, Haoran Hao, Tianyi Zhang, Songze Li, Xiangyu Zhao, Haodong Duan,
+Nianchen Deng, Bin Fu, Yinan He, Yi Wang, Conghui He, Botian Shi, Junjun He, Yingtong
+Xiong, Han Lv, Lijun Wu, Wenqi Shao, Kaipeng Zhang, Huipeng Deng, Biqing Qi, Jiaye Ge,
+Qipeng Guo, Wenwei Zhang, Songyang Zhang, Maosong Cao, Junyao Lin, Kexian Tang, Jianfei Gao, Haian Huang, Yuzhe Gu, Chengqi Lyu, Huanze Tang, Rui Wang, Haijun Lv, Wanli
+Ouyang, Limin Wang, Min Dou, Xizhou Zhu, Tong Lu, Dahua Lin, Jifeng Dai, Weijie Su,
+Bowen Zhou, Kai Chen, Yu Qiao, Wenhai Wang, and Gen Luo. InternVL3.5: Advancing
+Open-Source Multimodal Models in Versatility, Reasoning, and Efficiency, August 2025b. URL
+http://arxiv.org/abs/2508.18265. arXiv:2508.18265 [cs].
+Zeqing Wang, Wentao Wan, Qiqing Lao, Runmeng Chen, Minjie Lang, Xiao Wang, Keze Wang,
+and Liang Lin. Towards Top-Down Reasoning: An Explainable Multi-Agent Approach for Visual Question Answering, February 2025c. URL http://arxiv.org/abs/2311.17331.
+arXiv:2311.17331 [cs].
+Shengqiong Wu, Hao Fei, Leigang Qu, Wei Ji, and Tat-Seng Chua. NExT-GPT: Any-toAny Multimodal LLM, September 2023. URL http://arxiv.org/abs/2309.05519.
+arXiv:2309.05519 [cs].
+15
+
+Published as a conference paper at ICLR 2026
+
+Bin Xiao, Haiping Wu, Weijian Xu, Xiyang Dai, Houdong Hu, Yumao Lu, Michael Zeng, Ce Liu,
+and Lu Yuan. Florence-2: Advancing a Unified Representation for a Variety of Vision Tasks.
+In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pp.
+4818–4829, 2024. URL https://openaccess.thecvf.com/content/CVPR2024/
+html/Xiao_Florence-2_Advancing_a_Unified_Representation_for_a_
+Variety_of_Vision_CVPR_2024_paper.html.
+An Yang, Anfeng Li, Baosong Yang, Beichen Zhang, Binyuan Hui, Bo Zheng, Bowen Yu, Chang
+Gao, Chengen Huang, Chenxu Lv, Chujie Zheng, Dayiheng Liu, Fan Zhou, Fei Huang, Feng Hu,
+Hao Ge, Haoran Wei, Huan Lin, Jialong Tang, Jian Yang, Jianhong Tu, Jianwei Zhang, Jianxin
+Yang, Jiaxi Yang, Jing Zhou, Jingren Zhou, Junyang Lin, Kai Dang, Keqin Bao, Kexin Yang,
+Le Yu, Lianghao Deng, Mei Li, Mingfeng Xue, Mingze Li, Pei Zhang, Peng Wang, Qin Zhu, Rui
+Men, Ruize Gao, Shixuan Liu, Shuang Luo, Tianhao Li, Tianyi Tang, Wenbiao Yin, Xingzhang
+Ren, Xinyu Wang, Xinyu Zhang, Xuancheng Ren, Yang Fan, Yang Su, Yichang Zhang, Yinger
+Zhang, Yu Wan, Yuqiong Liu, Zekun Wang, Zeyu Cui, Zhenru Zhang, Zhipeng Zhou, and Zihan
+Qiu. Qwen3 Technical Report, May 2025. URL http://arxiv.org/abs/2505.09388.
+arXiv:2505.09388 [cs].
+Lihe Yang, Bingyi Kang, Zilong Huang, Zhen Zhao, Xiaogang Xu, Jiashi Feng, and Hengshuang
+Zhao. Depth Anything V2, October 2024. URL http://arxiv.org/abs/2406.09414.
+arXiv:2406.09414.
+Zhengyuan Yang, Zhe Gan, Jianfeng Wang, Xiaowei Hu, Yumao Lu, Zicheng Liu, and Lijuan Wang.
+An Empirical Study of GPT-3 for Few-Shot Knowledge-Based VQA. In Proceedings of the
+AAAI Conference on Artificial Intelligence, volume 36, pp. 3081–3089, June 2022. doi: 10.
+1609/aaai.v36i3.20215. URL https://ojs.aaai.org/index.php/AAAI/article/
+view/20215.
+Haoxuan You, Rui Sun, Zhecan Wang, Long Chen, Gengyu Wang, Hammad Ayyubi, Kai-Wei
+Chang, and Shih-Fu Chang. IdealGPT: Iteratively Decomposing Vision and Language Reasoning via Large Language Models. In The 2023 Conference on Empirical Methods in Natural Language Processing, December 2023. URL https://openreview.net/forum?id=
+IvwcvJHLpc.
+Shengbin Yue, Siyuan Wang, Wei Chen, Xuanjing Huang, and Zhongyu Wei. Synergistic MultiAgent Framework with Trajectory Learning for Knowledge-Intensive Tasks. In Proceedings of
+the AAAI Conference on Artificial Intelligence, volume 39, pp. 25796–25804, April 2025. doi: 10.
+1609/aaai.v39i24.34772. URL https://ojs.aaai.org/index.php/AAAI/article/
+view/34772.
+Wentao Zhang, Liang Zeng, Yuzhen Xiao, Yongcong Li, Ce Cui, Yilei Zhao, Rui Hu, Yang Liu,
+Yahui Zhou, and Bo An. AgentOrchestra: A Hierarchical Multi-Agent Framework for GeneralPurpose Task Solving, August 2025. URL http://arxiv.org/abs/2506.12508.
+arXiv:2506.12508 [cs].
+Yaoyao Zhong, Mengshi Qi, Rui Wang, Yuhan Qiu, Yang Zhang, and Huadong Ma. VIoTGPT:
+Learning to Schedule Vision Tools Towards Intelligent Video Internet of Things. In Proceedings of the AAAI Conference on Artificial Intelligence, volume 39, pp. 10680–10688, April
+2025. doi: 10.1609/aaai.v39i10.33160. URL https://ojs.aaai.org/index.php/
+AAAI/article/view/33160.
+Deyao Zhu, Jun Chen, Xiaoqian Shen, Xiang Li, and Mohamed Elhoseiny. MiniGPT-4: Enhancing Vision-Language Understanding with Advanced Large Language Models, April 2023. URL
+http://arxiv.org/abs/2304.10592. arXiv:2304.10592 [cs].
+Jinguo Zhu, Weiyun Wang, Zhe Chen, Zhaoyang Liu, Shenglong Ye, Lixin Gu, Hao Tian, Yuchen
+Duan, Weijie Su, Jie Shao, Zhangwei Gao, Erfei Cui, Xuehui Wang, Yue Cao, Yangzhou Liu,
+Xingguang Wei, Hongjie Zhang, Haomin Wang, Weiye Xu, Hao Li, Jiahao Wang, Nianchen
+Deng, Songze Li, Yinan He, Tan Jiang, Jiapeng Luo, Yi Wang, Conghui He, Botian Shi,
+Xingcheng Zhang, Wenqi Shao, Junjun He, Yingtong Xiong, Wenwen Qu, Peng Sun, Penglong
+Jiao, Han Lv, Lijun Wu, Kaipeng Zhang, Huipeng Deng, Jiaye Ge, Kai Chen, Limin Wang, Min
+Dou, Lewei Lu, Xizhou Zhu, Tong Lu, Dahua Lin, Yu Qiao, Jifeng Dai, and Wenhai Wang.
+16
+
+Published as a conference paper at ICLR 2026
+
+InternVL3: Exploring Advanced Training and Test-Time Recipes for Open-Source Multimodal
+Models, April 2025. URL http://arxiv.org/abs/2504.10479. arXiv:2504.10479 [cs].
+
+17
+
+Published as a conference paper at ICLR 2026
+
+A
+
+T HE U SE OF L ARGE L ANGUAGE M ODELS
+
+We declare that LLMs (GPT-5/5.1/5.2) are used for the paper language polishing.
+
+B
+
+I MPLEMENTATION OF AGENTS
+
+In this section we introduce the detailed implementation of the four agents shown in Figure 5. The
+hyper agent is triggered at each decision point of the hyper automaton (on I NITIAL, and after any
+agent returns) then summarizes the shared memory mt and applies the learned transition δθ to select
+the next state st+1 . Other agents are triggered only when selected by the hyper agent. Upon entry,
+the selected agent always starts at its internal I NITIAL state; reaching the agent’s R ETURN state
+hands control back to the hyper automaton.
+We implemented three agents to span levels of reasoning: a Specialized System-1 perception agent,
+an Oneshot fast thinking agent, and a Stepwise slow thinking agent. Each agent brings different
+trade-offs. The Specialized agent is fast and verifiable for easier subtasks such as finding an object
+without complex relations, but lacks depth for multi-step compositional reasoning. The Oneshot
+reasoner is cheap and effective on moderately compositional queries, yet might fail on edge cases
+because it generates the full workflow without accessing the intermediate variable in the workflow.
+The Stepwise agent is designed for complex reasoning via verified program execution, but incurs
+higher latency and cost. The formulation is modular and scales to additional agents without changing
+the other part of the system.
+B.1
+
+H YPER AGENT
+
+As illustrated in Figure 5 (top-left), the hyper agent is triggered from hyper automaton, uses the
+Memory Prompter to convert the current shared memory snapshot mt into a text prompt xt , and
+feeds it to the trainable LLM State Controller to propose the next state. If the LLM fails to generate a
+valid proposal, we re-prompt once with extra feedback. The output is then checked by the Transition
+Verifier, which enforces valid state selection. On success, the hyper agent returns the chosen state to
+the hyper automaton and appends the decision to mt .
+B.2
+
+O NESHOT R EASONER
+
+In Figure 5 (top-right), the oneshot reasoner enters at Initial from the hyper automaton, calls the
+Code Generator to produce a Python program, and passes it to the Code Verifier for format checks;
+generation or validation failure triggers a regeneration. Verified code is executed by the Code Interpreter in a Python environment; runtime errors trigger regeneration with extra feedback. On success,
+the program, execution history, and feedback are appended to mt and the agent returns to the hyper
+Hyper Agent
+
+Oneshot Reasoner
+Fail to Generate
+Success
+
+Error
+
+Success
+
+Success
+
+Return
+
+Initial
+Memory
+
+Prompter
+
+LLM State
+
+Controller
+
+Format
+Error
+
+Transition
+
+Verifier
+
+Return
+
+Initial
+Normal Transition
+Self Correction
+
+Stepwise Reasoner
+
+Success
+
+Fail to 
+
+Generate
+
+Code
+
+Generator
+
+Not Valid
+
+Code
+
+Verifier
+
+Code
+
+Interpreter
+
+Specialized Agent
+
+Success
+Error
+
+Initial
+
+Success
+
+Error
+Success
+
+Success
+
+Fail to 
+
+GenerateInstruction
+
+
+Generator
+
+Success
+
+Success
+
+Return
+Fail to 
+
+
+Instruction
+ Generate Code
+
+Verifier
+Generator
+
+Not Valid
+
+Code
+
+Verifier
+
+Code
+
+Interpreter
+
+Return
+
+Initial
+Not Valid
+
+Expert
+
+Model
+
+Prediction
+
+Verifier
+
+Figure 5: Details of agents in MATA. Each block shows the sub-automaton executed when the
+hyper automaton transits into that agent. Black arrows indicate the normal paths; red arrows show
+local error-correction paths. Persistent failures transition to FAILURE state of the hyper automaton
+(omitted for clarity).
+18
+
+Published as a conference paper at ICLR 2026
+
+Table 7: More generalizability results. The top-left header cell uses a diagonal split to indicate
+Training Data (rows, ↓) versus Test Data (columns, →). Row Single the same dataset trains each
+LLM state controller in hyper agent on each training set of the dataset and tests on the test set of
+the same dataset (domain-specific) ; row All exclude the dataset trains on the union of the remaining
+datasets and tests on the held-out column dataset (domain-transfer) ; row All include the dataset
+trains jointly on all datasets (general) . Off-domain accuracies are close to the domain-specific ones,
+indicating that the learned transition policy generalizes across tasks.
+Test
+Training
+Single the same dataset
+All exclude the dataset
+All include the dataset
+
+GQA
+64.7
+63.5
+64.9
+
+VQA
+OK-VQA
+76.5
+75.4
+76.0
+
+RefCOCO
+96.3
+96.1
+96.3
+
+Visual Grounding
+RefCOCO+ RefCOCOg
+93.9
+90.8
+93.8
+90.7
+93.8
+90.7
+
+automaton; if verification or execution repeatably fails, the agent triggers FAILURE, and returns to
+the hyper automaton.
+B.3
+
+S TEPWISE R EASONER
+
+The stepwise reasoner (Figure 5, bottom-left) handles more complex, slower reasoning: from hyper
+automaton (Initial), the Instruction Generator proposes the next one-step plan based on mt , which
+the Instruction Verifier validates; a verification error or failure to generate triggers one regeneration.
+The accepted plan is translated by the Code Generator, checked by the Code Verifier, and executed
+by the Code Interpreter; each stage includes error-correction loops as annotated in the figure. If
+execution succeeds, new context (variables, history, feedback) is written into mt and the agent returns to the hyper automaton; if any stage stays invalid after multiple attempts, the agent triggers
+FAILURE and returns control to the hyper automaton.
+B.4
+
+S PECIALIZED AGENT
+
+As shown in Figure 5 (bottom-right), the specialized agent begins from hyper automaton, runs an
+Expert Model (e.g., VLM, object detector), and its output is verified by the Prediction Verifier for
+extra checks. If the output is not valid, the agent performs one adaptive retry; otherwise it commits
+the intermediate results and verifier feedback to mt and returns to the hyper automaton. Persistent
+invalid results trigger failure and return control to the hyper automaton.
+
+C
+
+M ORE A NALYSIS FOR G ENERALIZABILITY
+
+We conducted further generalization analysis by training the hyper agent with several more dataset
+configurations. As shown in Table 7, we classify the results with three different training data configurations: Single the same dataset means that the hyper agent is trained on the training set of the
+test dataset. All exclude the dataset means the hyper agent is trained on the whole MATA-SFT90K dataset but excluding the corresponding training data from the same dataset, to ensure that it is
+domain-transfer. All include the dataset means the hyper agent is trained on the whole MATA-SFT90K dataset which includes the training data from the same dataset to be evaluated. From the extra
+results, the observation further supports our findings in section 4.2.
+Across all benchmarks, the domain-transfer setting (All exclude the dataset) is around 1 percentage
+of the domain-specific setting (Single the same dataset). The general model jointly training on the
+whole dataset (All include the dataset) reaches similar performance of domain-specific. The small
+gaps indicate that the learned transition policy is largely task-agnostic: it transfers across VQA and
+grounding without per-dataset tuning, and gains from multi-dataset SFT do not harm in-domain
+accuracy. Practically, this suggests a single hyper agent can be trained once and reused across visual
+reasoning tasks.
+19
+
+Published as a conference paper at ICLR 2026
+
+D
+
+M ORE A NALYSIS FOR H YPER AGENT
+
+We conduct experiments (Table 8) using different models as the state controller in hyper agent. We
+trained the Qwen3-4B (LLM) (Yang et al., 2025) and Qwen3-VL 4B (VLM) (Bai et al., 2025a)
+on the full set of MATA-SFT-90K. From the results, the state controller is insensitive to the backbone type: swapping the LLM for a VLM yields near-similar performance across all datasets. We
+therefore adopt the LLM controller to minimize system complexity and resource requirements while
+retaining performance.
+Table 8: More results for the state controller model of hyper agent. All models are trained on
+the trajectory transitions of the full MATA-SFT-90K.
+State Controller
+Qwen3 (4B) (LLM)
+Qwen3-VL (4B) (VLM)
+
+E
+
+GQA
+64.9
+64.6
+
+OK-VQA
+76.0
+76.3
+
+RefCOCO
+96.3
+96.4
+
+RefCOCO+
+93.9
+94.0
+
+RefCOCOg
+90.8
+89.3
+
+Ref-Adv
+77.3
+76.9
+
+M ORE A NALYSIS FOR E FFICIENCY
+
+To further analyze the system time and spatial complexity, we collected and calculated the inference
+time (seconds), LLM API costs (USD, GPT-4o mini) and vRAM usage (GB) per query, between the
+state-of-the-art monolithic method Qwen2.5-VL (72B) (Bai et al., 2025b) with 4-bit quantization,
+the open sourced compositional agentic method HYDRA (Ke et al., 2024), the baseline which call
+all sub-agents exhaustively to aggregate the final answer, and the proposed method MATA. All
+measurements are taken on a single NVIDIA L40s 48GB GPU on RefCOCO dataset. As shown in
+Table 9, MATA attains the best efficiency compared with HYDRA and exhaustive baseline and is
+comparable to the monolithic baseline, while achieving the lowest API cost and a moderate vRAM
+usage (substantially below the 72B model).
+Table 9: More analysis for efficiency. We compare the inference time in seconds, LLM API costs
+in USD, and vRAM in GB, on RefCOCO dataset.
+Method
+Qwen2.5-VL (72B)
+HYDRA
+Exhaustive
+MATA
+
+F
+
+Time (Seconds)
+6.27
+14.93
+32.74
+6.10
+
+LLM API Cost (USD)
+–
+0.00332
+0.00531
+0.00069
+
+vRAM Usage (GB)
+43.70
+17.59
+13.08
+19.64
+
+C OMPARISON WITH D IRECT SFT
+
+We compare two paradigms: (i) direct SFT of a single VLM (Qwen3-VL (4B) (Bai et al., 2025a),
+InternVL2.5 (8B) (Chen et al., 2025)) to output answers, and (ii) MATA, which finetunes only the
+hyper agent’s state controller model as a transition policy. As summarized in Table 10, answeronly direct SFT can improve in-domain accuracy but often harms cross-task generalization, which
+is consistent with catastrophic forgetting of the model’s latent “think-then-answer” ability, while
+MATA maintains strong transfer because it learns transitions between agents rather than a direct
+monolithic question-to-answer mapping. The direct SFT on the related dataset gains for Qwen3VL (4B) reflect its lower zero-shot starting point; stronger VLM like InternVL2.5 (8B) is typically
+harder to improve via answer-only direct SFT. Overall, MATA delivers higher accuracy and more
+robust cross-task performance than direct SFT.
+
+G
+
+P ROMPT T EMPLATES
+
+MATA uses LLMs in multiple places, including: (1) A trainable LLM state controller in the Hyper
+Agent routes between states by reading a summarized snapshot of the shared memory. (2) An Instruction Generator in Stepwise Reasoner proposes the next micro-plan. (3) A Code Generator in
+20
+
+Published as a conference paper at ICLR 2026
+
+Table 10: Direct SFT vs. MATA. We compare (i) directly finetuning a VLM baseline (Qwen3VL 4B, InternVL-2.5 8B) to output answers and (ii) MATA (SFT on hyper agent) on GQA and
+OK-VQA. All values are accuracy (%). “–” denotes using public weights without task-specific
+finetuning. Training Dataset indicates which task split was used for SFT. Color codes follow prior
+tables: domain-specific, domain-transfer, general. Note the pretraining data of LLM/VLMs are
+unknown; colors are for ease of comparison.
+Method
+
+Training Dataset
+
+Qwen3-VL (4B)
+Qwen3-VL (4B)
+Qwen3-VL (4B)
+Qwen3-VL (4B)
+InternVL2.5 (8B)
+InternVL2.5 (8B)
+InternVL2.5 (8B)
+InternVL2.5 (8B)
+MATA
+MATA
+MATA
+MATA
+
+–
+GQA
+OK-VQA
+GQA, OK-VQA
+–
+GQA
+OK-VQA
+GQA, OK-VQA
+–
+GQA
+OK-VQA
+GQA, OK-VQA
+
+Test Dataset
+GQA OK-VQA
+51.6
+44.4
+63.2
+61.6
+57.5
+68.1
+63.1
+66.9
+61.5
+75.2
+63.9
+64.1
+35.8
+72.4
+63.8
+65.2
+58.5
+75.1
+64.7
+75.8
+64.1
+76.5
+64.9
+76.4
+
+Stepwise Reasoner generates Python code for that step. (4) The Oneshot Reasoner employs another
+Code Generator to produce a single-pass program. Across roles, prompts are concise, instructionstyle templates that expose the relevant slice of shared memory and tool signatures and require
+outputs in strict JSON/XML blocks for reliable parsing. The prompt template of the LLM state controller is shown in prompt 3.1. The following prompt blocks show detailed prompt templates of the
+LLMs.
+Prompt G.1: Instruction Generator in Stepwise Reasoner
+You are an AI assistant designed to assist with compositional visual reasoning tasks providing valid step by
+step instruction for answering questions and understanding visual information.
+Instruction Settings
+——————–
+<InstructionSetting>{instruction_setting}</InstructionSetting>
+Skills Overview
+—————
+The following are the skills that you can use to solve the query:
+<Skills>{skills}</Skills>
+Task Description
+—————Review the task description below to understand the problem context:
+<TaskDescription>{task_title}{task_description}</TaskDescription>
+Example Instructions
+——————How to Use these skills:
+<Examples>{instruction_example}</Examples>
+User Query
+———This is the query you need to solve:
+<Query>{query}</Query>
+Current Step
+————
+<Step>{current_step}</Step>
+Previous Instructions
+———————
+<PreviousInstructions>{previous_instructions}</PreviousInstructions>
+Previously Executed Code
+
+21
+
+Published as a conference paper at ICLR 2026
+
+———————–
+<ExecutedCode>{previous_code}</ExecutedCode>
+Execution Results
+—————<ExecutionResults>{execution_results}</ExecutionResults>
+Available Variables
+——————<Variables>{variables_info}</Variables>
+——————Based on the current context, generate possible next instructions to help solve the query. For each instruction, assign a probability score indicating how promising it will lead to the final answer.
+Your response must be in this JSON array format:
+{"instructions": [ {"instruction": "specific instruction", "probability": 0.X}, {"instruction": "another instruction", "probability": 0.Y}, ... ]}
+
+Prompt G.2: Code Generator in Stepwise Reasoner
+You are a helpful assistant specializing in visual reasoning tasks. Your goal is to generate Python code that
+solves a visual reasoning query using the provided code API and examples.
+API Specification
+—————–
+Use the following code API to guide your solution:
+<CodeAPI>{code_api}</CodeAPI>
+Task Description
+—————Review the task description below to understand the problem context:
+<TaskDescription>{task_title}{task_description}</TaskDescription>
+Example Code
+———–
+Here is an example that illustrates the expected format and approach:
+<Examples>{code_example}</Examples>
+User Query
+———This is the query you need to solve:
+<Query>{query}</Query>
+Current Step
+————
+<Step>{current_step}</Step>
+Previous Instructions
+———————
+<PreviousInstructions>{previous_instructions}</PreviousInstructions>
+Current Instruction
+——————<Instruction>{instruction}</Instruction>
+Previously Executed Code
+———————–
+<ExecutedCode>{previous_code}</ExecutedCode>
+Execution Results
+—————<ExecutionResults>{execution_results}</ExecutionResults>
+Available Variables
+——————<Variables>{variables_info}</Variables>
+——————Generate Python code that solves the query based on the current instruction. Your code should build upon
+previous steps and use the available variables. Use the code API as shown in the example. Enclose your
+code in <PythonCode></PythonCode> tags. If your code provides a final answer, assign it to a variable
+named “final_answer”.
+
+Prompt G.3: Code Generator in Oneshot Reasoner
+You are a helpful assistant specializing in visual reasoning tasks. Your goal is to generate Python code that
+solves a visual reasoning query using the provided code API and examples.
+
+22
+
+Published as a conference paper at ICLR 2026
+
+API Specification
+—————–
+Use the following code API to guide your solution:
+<CodeAPI>{code_api}</CodeAPI>
+Task Description
+—————Review the task description below to understand the problem context:
+<TaskDescription>{task_title}{task_desc}</TaskDescription>
+Example for Reference
+———————
+Here is an example that illustrates the expected format and approach:
+<Example>{code_example}</Example>
+User Query
+———This is the query you need to solve:
+<Query>{query}</Query>
+Extra Context
+—————<ExtraContext>{extra_context}</ExtraContext>
+Code Initialization
+——————An instance of the "ImagePatch" class is already provided. Use the following initialization code as the
+starting point:
+<ExecutedCode>
+image_patch = ImagePatch(image)
+</ExecutedCode>
+Instruction:
+————
+Generate Python code that utilizes the provided API and initialization to solve the query enclosed within
+the <PythonCode></PythonCode> block. Ensure your solution follows the structure and style of the given
+example. Ensure the variable “final_answer” is assigned to the result of the query.
+
+H
+
+DATASET E XAMPLE
+
+H.1
+
+E XAMPLE FOR VQA
+
+Example H.1: MATA-SFT-90K Example Input
+<TaskDescription>
+Compositional image question answering
+This type of question is intended to return a textual answer to the given question.
+Please use "final_answer" as the variable name when providing Python code. Make sure "final_answer" is
+string type.
+E.g., For the question "What sport can you use this for?", please provide the name of the sport as your
+answer in the final step.
+E.g., For the question "Is it good weather?", the final answer must be either "yes" or "no".
+</TaskDescription>
+<Query>Is the tall clock small or large?</Query>
+<Instructions></Instructions>
+<Feedback>
+Detection result: Only one clock has been detected in original_image.
+</Feedback>
+<Code>
+image_patch = ImagePatch(image)
+# Find clock in the image
+clock_patches = image_patch.find(["clock"])["clock"]
+# Only one clock has been detected
+clock_patch = clock_patches[0]
+</Code>
+<Variables>
+image_patch: ImagePatch(0, 0, 500, 333), patch name: original_image
+clock_patches: [ImagePatch(234, 131, 285, 182)]
+
+23
+
+Published as a conference paper at ICLR 2026
+
+clock_patch: ImagePatch(234, 131, 285, 182), patch name: clock_1_in_original_image
+</Variables>
+<StateHistory>
+Initial
+StepWiseReasoning
+StepWiseReasoning
+</StateHistory>
+<State>StepWiseReasoning</State>
+<CurrentStep>3</CurrentStep>
+Based on the information above, determine the next state the system should transition to. Choose from the
+following states:
+<StateCandidates>
+Final
+Specialized
+OneShotReasoning
+StepWiseReasoning
+</StateCandidates>
+Return the name wrapped in <NextState> tags.
+
+Example H.2: MATA-SFT-90K Example Output
+<NextState>StepWiseReasoning</NextState>
+
+H.2
+
+E XAMPLE FOR GROUNDING
+
+Example H.3: MATA-SFT-90K Example Input
+<TaskDescription>
+Referring Expression Comprehension
+This type of task is to return one image patch in the image that corresponds best to the given query.
+The object described by the query must exist in the image, and only have one patch. You need to first detect
+that kind of object in the image and then identify which one matches the description in the query.
+Please use "final_answer" as the target image patch name when providing Python code. Make sure only one
+ImagePatch in "final_answer".
+E.g., query is "left woman with shoes," return one of the detected woman patches in the final step, don’t
+return shoes patch.
+E.g., query is "muffins on the table," return one of the muffin patches in the final step, don’t return table
+patch.
+E.g., query is "white chaise under window", return one of the chaise patches in the final step, don’t return
+window patch.
+</TaskDescription>
+<Query>far right</Query>
+<Instructions></Instructions>
+<Feedback>
+Detection result: 5 people have been detected in original_image.
+</Feedback>
+<Code>
+image_patch = ImagePatch(image)
+# Find people in the image
+people_patches = image_patch.find(["people"])
+</Code>
+<Variables>
+image_patch: ImagePatch(0, 0, 640, 427), patch name: original_image
+people_patches: {"people": [ImagePatch(374, 0, 584, 377), ImagePatch(0, 7, 153, 353), ImagePatch(200,
+47, 361, 408), ImagePatch(517, 0, 640, 382), ImagePatch(113, 174, 195, 353)]}
+</Variables>
+<StateHistory>
+Initial
+OneShotReasoning
+StepWiseReasoning
+</StateHistory>
+<State>StepWiseReasoning</State>
+
+24
+
+Published as a conference paper at ICLR 2026
+
+<CurrentStep>3</CurrentStep>
+Based on the information above, determine the next state the system should transition to. Choose from the
+following states:
+<StateCandidates>
+Final
+Specialized
+OneShotReasoning
+StepWiseReasoning
+</StateCandidates>
+Return the name wrapped in <NextState> tags.
+
+Example H.4: MATA-SFT-90K Example Output
+<NextState>StepWiseReasoning</NextState>
+
+I
+
+Q UALITATIVE A NALYSIS
+
+We compare MATA with Qwen3-VL (Bai et al., 2025a), ViperGPT (Surís et al., 2023), HYDRA (Ke
+et al., 2024), and NAVER (Cai et al., 2025). In easy cases (e.g., “find people in red”), the MATA
+hyper agent transits to a Specialized agent that answers directly, and most baselines also succeed. For
+more complex queries (see Figure 6), stronger compositional reasoning is required; prior methods
+often hallucinate due to some bottlenecks (e.g., noisy tool outputs, fixed pipelines, no verification).
+In Example 1 (GQA), MATA explores with several Stepwise Reasoner steps and, after verification
+failures, hands off the shared memory to the Oneshot Reasoner to understand the previous experience, and produce the correct answer. In Example 2 (zero-shot, generated by GPT-Image), it begins
+with the Oneshot Reasoner to build the initial exploration and save to shared memory, then transitions to the Stepwise Reasoner, which first isolates the left table and then counts, again yielding the
+correct result. These cases illustrate how learned transitions improves robustness.
+
+Example from GQA
+
+Example zero-shot
+
+Query: “What’s in front of the fence?" Ground truth: chair
+Qwen3-VL (4B): A small bird perched on the table. → ✗ incorrect.
+ViperGPT: Generates a single program; mis-detects objects “table” → ✗ incorrect.
+HYDRA: Multistep programming reasoning, but relies on the noisy tools output and unable to
+fix, producing “There are no objects in front of the fence.” → ✗ incorrect.
+NAVER: Follows fixed Perception→Logic→Answering; cannot produce the text answer → ✗
+incorrect.
+MATA (ours): Initially the hyper agent calls Stepwise Reasoner 3 steps, with detailed exploration and trials, but failed to get the result. Then inherited with the experience of the memory,
+the hyper agent decides to transit to Oneshot Reasoner, which generates a correct answer based
+on the previous experience: “white chair” → ✓ correct.
+
+Query: “How many red cups on the left table?" Ground truth: 3
+Qwen3-VL (4B): ... (thinking) There are 4 red cups on the left table. → ✗ incorrect.
+ViperGPT: Generates a faulty program; no mechanism to fix the program, cannot produce answer → ✗ incorrect.
+HYDRA: Detects 12 cups and queries color per cup, but never restricts to the left table; answerer then guesses 5 → ✗ incorrect.
+NAVER: Manually defined Perception→Logic→Answering automaton picks only cup, build
+the logic that treats “left table" as left of other cups, then collapses to one localization instead
+of counting; with confidence thresholding and counting to the detections it yields the correct
+count 3 → ✓ partial correct.
+MATA (ours): The hyper agent calls Oneshot Reasoner but failed to get a confident answer,
+then transfers to Stepwise Reasoner invoked 4 times to generate the final answer: 3 → ✓ correct.
+
+Figure 6: Qualitative comparison. Previous methods either commit to a single pass (ViperGPT),
+multi-step within one agent (HYDRA), or follow a fixed automaton (NAVER). MATA learns when
+to switch agents and re-enter perception based on shared-memory feedback, yielding robust outcomes on the examples not only from GQA but also the unseen set.
+
+25
+
+

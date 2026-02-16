@@ -1,0 +1,2593 @@
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+Shuo Liu 1 Tianle Chen 1 Ryan Amiri 1 Christopher Amato 1
+
+arXiv:2601.21972v2 [cs.AI] 4 Feb 2026
+
+Abstract
+
+In this context, it is becoming popular to explore coordinating multiple LLMs to improve performance where agents
+are specified by roles, e.g., generators, planners, or verifiers (Wu et al., 2023; Du et al., 2023; Skreta et al., 2023;
+Qian et al., 2024; Zhang et al., 2025). Building on the studies of Multi-Agent Systems (MAS) (Weiss, 1999; Stone &
+Veloso, 2000; Van der Hoek & Wooldridge, 2008; Shoham &
+Leyton-Brown, 2009), recent methods employ Multi-Agent
+Reinforcement Learning (MARL) to optimize their interactions (Liu et al., 2025a;b; Feng et al., 2025; Chen et al., 2025;
+Subramaniam et al., 2025; Wu et al., 2025b). However, most
+existing approaches remain confined to predefined execution paradigms, which limits their applicability to broader
+settings. Moreover, these agents often rely on extensive
+inter-agent communication to accomplish tasks, requiring
+centralized execution, which results in limited scalability as
+well as potential privacy issues in larger-scale MAS.
+
+Recent work has explored optimizing LLM collaboration through Multi-Agent Reinforcement
+Learning (MARL). However, most MARL finetuning approaches rely on predefined execution
+protocols, which often require centralized execution. Decentralized LLM collaboration is
+more appealing in practice, as agents can run
+inference in parallel with flexible deployments.
+Also, current approaches use Monte Carlo methods for fine-tuning, which suffer from high variance and thus require more samples to train
+effectively. Actor-critic methods are prevalent
+in MARL for dealing with these issues, so we
+developed Multi-Agent Actor-Critic (MAAC)
+methods to optimize decentralized LLM collaboration. In this paper, we analyze when
+and why these MAAC methods are beneficial.
+We propose 2 MAAC approaches, CoLLM-CC
+with a Centralized Critic and CoLLM-DC with
+Decentralized Critics. Our experiments across
+writing, coding, and game-playing domains show
+that Monte Carlo methods and CoLLM-DC can
+achieve performance comparable to CoLLMCC in short-horizon and dense-reward settings.
+However, they both underperform CoLLM-CC
+on long-horizon or sparse-reward tasks, where
+Monte Carlo methods require substantially more
+samples and CoLLM-DC struggles to converge.
+Our code is available at https://github.com/
+OpenMLRL/CoMLRL/releases/tag/v1.3.2.
+
+Decentralized systems have been studied for decades, where
+each agent is deployed separately and executes independently based on its own observations (Waldo et al., 1996;
+Ghosh, 2006; Oliehoek & Amato, 2016; Albrecht et al.,
+2024). Leveraging decentralized LLM agents to complete
+tasks is beneficial, as it reduces memory and storage pressure on each node and improves the efficiency (Huang et al.,
+2019; Lepikhin et al., 2020; Douillard et al., 2023; Wu et al.,
+2025a). However, how to effectively optimize these decentralized LLMs to collaborate remains an open question.
+Although Monte Carlo methods are widely adopted in RL
+fine-tuning due to their simplicity and efficiency (Li et al.,
+2023; Ahmadian et al., 2024; Shao et al., 2024; Guo et al.,
+2025; Hu et al., 2025; Liu et al., 2026b), extending them to
+optimize multi-LLM collaboration faces many difficulties
+(Liao et al., 2025; Zhang et al., 2025; Hong et al., 2025;
+Liu et al., 2026a). Agents need to wait until the end of an
+episode to receive return signals with high variance. This
+leads to poor sample efficiency and limits practicality in
+long-horizon or episodic tasks (Sutton & Barto, 1998).
+
+1. Introduction
+Advanced LLMs have demonstrated remarkable capabilities
+in natural language understanding and generation (Achiam
+et al., 2023; Anil et al., 2023; Bai et al., 2023; Guo et al.,
+2025). This progress has driven growing efforts to transform
+them into autonomous agents (Yao et al., 2022; Liu et al.,
+2023; Yang et al., 2024).
+
+In this paper, we develop Multi-Agent Actor-critic (MAAC)
+methods for optimizing decentralized LLM collaboration.
+We analyze when and why MAAC methods are beneficial
+for MARL fine-tuning and introduce 2 approaches, CoLLMCC that employs a centralized critic to estimate joint history
+values, and CoLLM-DC that uses decentralized critics to
+
+1
+Northeastern University, Boston, MA. Correspondence to:
+Christopher Amato <c.amato@northeastern.edu>.
+
+1
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+estimate individual history values. Our evaluation across
+writing, coding, and game-playing domains shows that, in
+dense-reward and short-horizon writing tasks, Monte Carlo
+methods and CoLLM-DC achieve performance comparable
+to CoLLM-CC; while in sparse-reward coding tasks and
+long-horizon Minecraft tasks, both underperform CoLLMCC, where Monte Carlo methods require substantially more
+samples for training, and CoLLM-DC fails to converge.
+
+critic methods can leverage additional information during
+the (centralized) training phase to support more accurate
+and stable gradient estimates while agents still execute in a
+decentralized manner (CTDE).
+
+Our contributions are summarized as follows: (i) We develop MAAC methods to optimize decentralized LLM collaboration and analyze their advantages; (ii) We propose
+CoLLM-DC and CoLLM-CC as 2 MAAC approaches; and
+(iii) Our results on collaborative writing, coding, and gameplaying tasks demonstrate that CoLLM-CC consistently
+outperforms Monte Carlo methods and CoLLM-DC, particularly in long-horizon tasks with sparse rewards.
+
+In decentralized LLM collaboration, multiple LLM agents
+cooperate to solve a class of tasks. Each task is expressed
+with natural-language observations and provided to the
+agents as individual prompts. Agents then produce responses in parallel according to their own policies conditioned on the prompt. The responses of all agents are
+aggregated to form a solution. All agents share a joint reward based on the aggregated outcome.
+
+3. Background
+3.1. Decentralized LLM Collaboration
+
+After each turn, users, external tools, and other models
+validate the proposed solution and may provide new requirements, suggestions, or constraints for the next iteration. This
+feedback, together with the dialog history, is maintained and
+serves both as a decision-making context and as experience
+for training. The interaction repeats until the task is solved
+or a predefined turn limit is reached. The goal of agents is
+to achieve higher-quality solutions with minimal iterations.
+
+2. Related Works
+2.1. LLM Collaboration
+A lot of works employ LLM agents to collaborate with complementary roles (e.g., planner, retriever, generator, verifier)
+(Wu et al., 2023; Du et al., 2023; Skreta et al., 2023; Qian
+et al., 2024; Zhang et al., 2025; Liu et al., 2025a;b; Wu
+et al., 2025b; Chen et al., 2025). While such role specialization can improve performance, most frameworks enforce
+rigid protocols, such as refinement pipelines, hierarchical
+decompositions, or discussion loops, which are hand-coded,
+entail heavy communication overhead, and typically require
+centralized execution to produce a solution. Also, it is still
+unclear whether such protocols are optimal cooperation
+schemes in general (Estornell & Liu, 2024; Cemri et al.,
+2025). An alternative is decentralized LLM collaboration,
+where agents run inference in parallel under limited or no
+communication (Chen et al., 2024; Qi et al., 2025; Yang
+et al., 2025a; Liu et al., 2026a). This paradigm improves efficiency and enables more flexible deployment across multiple small LLMs. However, how to effectively optimize such
+decentralized collaboration remains largely unexplored.
+
+Decentralized LLM collaboration offers great advantages
+by allowing specialized agents to divide and conquer complex problems and operate in parallel to improve efficiency.
+Rather than relying on a single gigantic LLM in a centralized system, lightweight agents in a decentralized system
+can focus on subtasks guided by their own prompts, thereby
+greatly reducing the overhead of maintaining long contexts
+and extracting relevant semantics. Deploying smaller models locally is also typically easier, safer, and more scalable,
+making decentralized LLM collaboration well-suited for
+applications such as long article generation, software engineering, and embodied coordination (Gao et al., 2023; Chen
+et al., 2024; Liu et al., 2026a; Wu et al., 2025a).
+3.2. LLM Dec-POMDP
+
+2.2. Actor-Critic Methods in Cooperative MARL
+
+Decentralized LLM collaboration can be seen as a subclass
+of the Dec-POMDP (Oliehoek & Amato, 2016), which is
+denoted as ⟨I, V, C, M, S, {Oi }, {Ai }, R, T, H⟩.
+
+Actor-Critic (AC) is a widely-used policy gradient architecture where an actor model selects actions based on its policy
+and a critic model estimates values during training (Sutton &
+Barto, 1998; Konda & Tsitsiklis, 1999). In the decentralized
+multi-agent setting, each agent acts based on its local observation (Oliehoek & Amato, 2016; Albrecht et al., 2024), and
+the critic can be instantiated either as an individual critic for
+independent learning (De Witt et al., 2020; Lee et al., 2022),
+or as a centralized-critic that conditions on joint history
+(Lowe et al., 2017; Foerster et al., 2018; Lyu et al., 2021;
+Yu et al., 2022; Lyu et al., 2023). Moreover, centralized-
+
+In an LLM Dec-POMDP, I denotes a set of n LLM agents,
+V is the token vocabulary in LLM inputs and outputs, C
+is the input context window size for each agent, and M
+is the max number of tokens in each LLM outputs. S :
+S sys × S usr denotes the full global state space. At turn
+t, st ∈ S consists of accessible parts ssys ∈ S sys from
+the system and inaccessible susr ∈ S usr parts from users.
+In RL fine-tuning via verifiable rewards (RLVR), only the
+accessible parts are used by the reward model. Oi is the
+2
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+observation space for agent i with O = ×i Oi the joint
+observation space, where a local observation oi,t is a natural
+language prompt providing a partial and noisy view of st ,
+and |Oi | = |V|C . Ai is the action space for agent i with
+A = ×i Ai the joint action space, where an individual action
+ai,t is its response to the given prompt, and |Ai | = |V|M .
+The joint reward function R : S sys ×A → R is implemented
+via predefined rules or a pretrained reward model. At turn
+t, the joint rewards rt ← R(ssys
+t , at ) are determined by the
+accessible part of current state ssys
+and the agents’ joint
+t
+action at = {a1,t , · · · , an,t }. T : S × A → ∆(S) is the
+underlying stochastic state transition function. At turn t,
+the agents’ joint actions at induce a shift to a new state
+st+1 ∼ T (·|st , at ), which reflects the updates in the user
+state and the states of external models and systems. H is
+the episode horizon, the turn limit of a dialog.
+
+MA-REINFORCE is initially designed to take one action at
+each turn during rollout. Recent MARL fine-tuning methods aim to reduce the variance of gradient estimation by
+generating K i.i.d. joint actions {a1t , · · · , aK
+t } for each history ht following policy π(·|ht ) (Liao et al., 2025; Zhang
+et al., 2025; Hong et al., 2025). In the multi-turn environment, each of these actions yields a successor observation
+{o1t+1 , · · · , oK
+t+1 }, and obtaining low-variance gradients for
+these successor histories {h1t+1 , · · · , hK
+t+1 } also requires K
+samples. This recursively expands into a K-ary rollout tree
+of depth H (Yang et al., 2025b; Liu et al., 2026a; Ding &
+Ye, 2025; Ji et al., 2025).
+We show that the average gradient estimator by K-sampling
+MA-REINFORCE is unbiased in Proposition 4.1.
+Proposition 4.1. For each history ht at t, t ∈ [0, H), suppose agents sample K ≥ 1 i.i.d. joint actions {a1t , · · · , aK
+t }
+from π(·|ht ). For each akt , an independent K-ary rollout
+tree is produced to estimate the corresponding expected
+Monte Carlo return Gkt . For agent i, define ḡi,t as the averaged gradient estimate over {a1i,t , · · · , aK
+i,t },
+
+Since both the accessible ssys and the inaccessible susr parts
+of the states cannot be directly observed by the agents.
+Each agent maintains its local observation-action history
+hi,t = {oi,0 , ai,0 , · · · , oi,t } to infer information about the
+state st = {ssys , susr }. The history of all agents forms a
+joint history ht = {h1,t , · · · , hn,t }, and all agents’ policies forms a joint policy π = {π1 , · · · , πn }. A solution
+to a Dec-POMDP is a joint policy that maximizes the
+expected cumulative reward over
+H, π ∗ =
+hP the horizon
+i
+H−1
+{π1∗ , · · · , πn∗ } = arg maxπ Eπ
+t=0 rt . We describe 3
+LLM Dec-POMDP instantiations in Section 6.
+
+K
+
+ḡi,t =
+
+k=1
+
+∗
+Then ḡi,t is unbiased for the true gradient gi,t
+,
+ ∗
+
+Eπ [ḡi,t | hi,t ] = Eπ gi,t
+| hi,t .
+
+Proof sketch. The gradient estimates of K-sampling MAREINFORCE equal those of the MA-REINFORCE in
+(Peshkin et al., 2001). By Theorem 1 therein, ḡi,t is unbiased. A full proof is provided in Appendix A.
+
+4. Cooperative MARL for LLM Fine-Tuning
+In this section, we introduce cooperative MARL methods
+and provide a theoretical analysis of their advantages and
+limitations when applied to LLM fine-tuning.
+
+Proposition 4.2 measures the variance reduction of Ksampling MA-REINFORCE. Under an independent rollout
+assumption, its variance scales as 1/K H−t in K.
+Proposition 4.2. Under the setting of Proposition 4.1, for
+any history hi,t , we assume the gradient estimates for
+{a1i,t , · · · , aK
+i,t } are independent and episodes are not terminated early. Let σ 2 be the gradient estimate variance when
+#K = 1, the variance of ḡi,t satisfies,
+
+4.1. MA-REINFORCE
+Multi-Agent REINFORCE (MA-REINFORCE) is a class of
+multi-agent policy gradient methods in which each agent i
+maintains an individual policy πθi , and updates it according
+to Monte-Carlo estimates of joint returns (Peshkin et al.,
+2001). Mathematically,
+∇θi J(θi ) = Eπ
+
+"H−1
+X
+
+ρi,t ∇θi log πθi (ai,t | hi,t ) G(ht ) − b(ht )
+
+
+
+t=0
+
+where G(ht ) = Eπ
+
+(1)
+
+τ −t
+γ
+r
+h
+is
+the
+expected
+τ
+t
+τ =t
+
+PH−1
+π
+
+(a
+
+|h
+
+1 X k
+ρi,t ∇θi log πθi (aki,t | hi,t ) Gkt .
+K
+
+,
+
+Varπ (ḡi,t | hi,t ) =
+
+σ2
+.
+K H−t
+
+Proof sketch. Without early termination, the K-ary rollout
+tree has K H−t i.i.d. leaf rollouts from hi,t . Under independent gradient estimation assumption, all these samples are
+effectively used in ḡi,t , yielding Var(ḡi,t |hi,t ) = σ 2 /K H−t .
+We provide the formal justification in Appendix A.
+
+)
+
+i,t
+i,t
+i
+return from ht , ρi,t = πθ θ,old
+(ai,t |hi,t ) is the importance
+i
+sampling ratio for correcting the off-policy action sampled,
+and b(ht ) denotes an action-independent baseline. In MAREINFORCE, agents learn directly from sampled returns
+without a critic. However, this method can not scale well to
+long-horizon online learning, because return signals are only
+available at dialog termination and Monte Carlo estimates
+suffer from high variance due to accumulated stochasticity.
+
+However, this variance reduction comes at the cost of a
+rapidly increasing LLM inference calls to maintain the rollout tree, as shown in Proposition 4.3.
+3
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
++
+
+KV-Cache
+
+Centralized Critic
+KV-Cache
+
+Transformer
+Blocks
+
+Replay Buffer
+Transformer
+Blocks
+
+-Head
+Agent
+
+...
+
+Agent
+
+(a)
+
+-Head
+
+(b)
+
+(c)
+
+Figure 1. Illustration of CoLLM-CC framework: (a) The agent model structure; (b) The overall centralized-critic architecture; (c) The
+critic model structure. The corresponding CoLLM-DC framework is shown in Appendix B.
+
+Proposition 4.3. Consider an H-horizon episode without
+early termination t ∈ [0, H). Suppose MA-REINFORCE
+expands a full K-ary rollout tree (K ≥ 1) and, at each
+history node, draws K i.i.d. joint actions. Each LLM runs
+one inference at a time to produce a response. Then the
+total number of inference calls required for this episode is
+H
+−1)
+Ncall (n, K, H) = nK(K
+.
+K−1
+
+CC learns a shared value function Vϕ (ht ) that conditions
+on the joint history ht (and even other available information
+during training) to update each agent’s policy πθi (·|hi,t ),
+∇θi J(θi ) = Eπ
+
+"H−1
+X
+
+#
+ρi,t ∇θi log πθi (ai,t | hi,t ) δ t ,
+
+t=0
+
+(4)
+where δ t = rt + γVϕ (ht+1 ) − Vϕ (ht ), and
+
+Proof. Since the rollout forms a K-ary tree in each episode,
+the total number of actions forms a geometric series. Thus,
+H
+PH−1
+−1)
+.
+Ncall (n, K, H) = nK ℓ=0 K l = nK(K
+K−1
+
+L(ϕ) = Eπ
+
+"H−1
+X
+
+#
+(rt + γVϕ (ht+1 ) − Vϕ (ht ))
+
+2
+
+.
+
+(5)
+
+t=0
+
+4.2. Multi-Agent Actor-Critic
+
+Since the critic is just a training construct, it can be removed
+during execution. As a result, in both DC and CC, agents
+can still execute in a decentralized manner.
+
+To reduce the variance of gradient estimates and improve
+sample efficiency, Actor-Critic (AC) methods learn a policy
+model (actor) πθ and a value model (critic) Vϕ (or Qψ ).
+In the multi-agent setting, AC methods are common with
+Decentralized Critics (Foerster et al., 2018; De Witt et al.,
+2020) or with a Centralized Critic (CC) (Lowe et al., 2017;
+Foerster et al., 2018; Yu et al., 2022).
+
+Assuming convergence of critics, both the gradient estimates
+of DC in Eq. 2 and CC in Eq. 4 are unbiased (Lyu et al.,
+2021; 2023). Though this assumption can be harder to
+satisfy for DC methods, because each individual critic Vϕi
+conditions only on its local history hi,t , while the policies
+of the other agents, π θ−i (·|h−i,t ), change during training
+and thus induce non-stationarity.
+
+In DC methods, each agent i maintains a local critic
+Vϕi (hi,t ) and updates its policy πθi (·|hi,t ) via
+"H−1
+#
+X
+∇θi J(θi ) = Eπ
+ρi,t ∇θi log πθi (ai,t | hi,t ) δi,t ,
+
+5. CoLLM-CC
+
+t=0
+
+We introduce CoLLM-CC as a representative MAAC approach and discuss key design features, with its DC counterpart, CoLLM-DC, presented in Appendix B.
+
+(2)
+where δi,t = rt + γVϕi (hi,t+1 ) − Vϕi (hi,t ), and each critic
+Vϕi is updated by minimizing its TD loss,
+"H−1
+#
+X
+2
+L(ϕi ) = Eπ
+(rt + γVϕi (hi,t+1 ) − Vϕi (hi,t )) .
+
+5.1. History Representation
+In cooperative MARL, each agent i typically uses a recurrent
+neural network (RNN) to encode its history hi,t by taking
+
+t=0
+
+(3)
+4
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+Algorithm 1: CoLLM-CC
+
+oi,t as input, and its hidden state zi,t serving as a compact
+but lossy representation (Sunehag et al., 2017; Foerster et al.,
+2018; Rashid et al., 2020; Wang et al., 2021). However, this
+paradigm cannot effectively scale to LLMs that take long
+prompt sequences as input, and language representations
+are often high-dimensional.
+
+1: Input: Taskset D, LLM agents {πθi }i∈I , centralized
+
+LLM critic Vϕ , learning rates απ , αV , discount γ, horizon H, replay buffer B, training epochs E
+2: for each episode do
+3:
+Sample a task from D
+4:
+Initialize prompts oi,0 , and oo ← {oi,0 }ni=1
+Initialize the dialog history hi,0 ← {oi,0 }, h0 ←
+5:
+{hi,0 }ni=1 , and obtain global information m0
+6:
+Initialize replay buffer B ← ∅
+7:
+for turn t = 0 to H − 1 do
+Generate response ai,t ∼ πθi (·|hi,t ), and calculate
+8:
+its policy πθi (ai,t |hi,t ) with TF, ∀i ∈ I
+9:
+at ← {ai,t }ni=1 , π θ ← {πθi }ni=1
+10:
+Record behavior policy π θold ← π θ
+Obtain joint reward rt , next turn prompts oi,t+1 ,
+11:
+∀i ∈ I, and global information mt+1
+12:
+Update hi,t+1 ← {hi,t , ai,t , oi,t+1 }, ∀i ∈ I
+13:
+ot+1 ← {oi,t+1 }ni=1 , ht+1 ← {hi,t+1 }ni=1
+14:
+Store (ht , mt , at , rt , ot+1 , mt+1 , π θold ) into B
+15:
+end for
+16:
+for training epoch e = 1, · · · , E do
+17:
+Sample a minibatch β from B
+
+18:
+for each hbt , mbt , abt , rtb , obt+1 , mbt+1 , π bθold ∈ β
+do
+19:
+Calculate Lb (ϕ, mb ) (Eq. 5)
+20:
+Calculate πθi (abi,t |hbi,t ) with TF, ∀i ∈ I
+21:
+Calculate ∇θi J b (θi ) (Eq. 4), ∀i ∈ I
+22:
+end for
+P
+1
+23:
+Update critic ϕ ← ϕ − αV |β|
+∇ϕ Lb (ϕ, mb )
+Pb
+1
+24:
+Update actor θi ← θi + απ |β| b ∇θi J b (θi )
+25:
+end for
+26: end for
+27: Output: {πθi }i∈I
+
+Transformers can capture long-range dependencies via attention mechanisms (Vaswani et al., 2017). This makes them
+well-suited for modeling dialog and interaction histories and
+serving as the backbone of modern LLMs. In CoLLM-CC,
+the dialog history is maintained in a key-value (KV) cache.
+At each turn, for each agent, we concatenate the KV pairs
+from previous turns with the new prompt from the environment (line 5 of Alg. 1), and then maintain only the most
+recent C pairs in the cache. The agents’ KV-caches are
+independent and private to maintain decentralized inference.
+In addition to ht , the global information mt can also be incorporated into value estimation to facilitate CC learning a
+richer or more accurate semantic representation during training. Such global information includes model specifications,
+task completion progress, or external models or tools existing in the system, which can either be appended as prompts
+or concatenated with z(ht ) in a numerical representation.
+5.2. Sequences as Actions
+Language is highly structured. Rewards in many language
+tasks are naturally defined at the level of complete responses.
+Considering each token an action may lead to extremely
+sparse, uninformative credit assignment. Sequences can
+be used as macro-actions in RL fine-tuning. However, unlike traditional MARL settings with a small action space
+and action probabilities are readily available, the responselevel action space is combinatorially large |V|M , making
+the probability of an entire sequence non-trivial to obtain.
+CoLLM-CC employs Teacher-Forced (TF) forward passes
+to obtain the probability of a response based on the current
+policy. At dialog turn t, for LLM agent i, the probability of
+an response ai,t given hi,t under policy πθi factorizes autoreQM
+gressively as πθi (ai,t |hi,t ) = µ=1 πθi (ai,tµ |hi,t , ai,t<µ ),
+where ai,tµ denotes the µth token in ai,t , and ai,t<µ is the token prefix up to µ. TF computes the conditional distributions
+for all target tokens in parallel under a causal mask, and thus
+the log-probability of the entire sequence can be efficiently
+obtained in one pass by summing the log-probabilities of
+each token. TF passes are applied twice in Alg. 1, when
+agents generate responses to roll out (line 8), and when they
+update their policies (line 20).
+
+for each agent o0 ← {o1,0 , · · · , on,0 }, with global information m0 obtained from the environment. At each
+turn t ∈ [0, H), each agent generates a response ai,t ∼
+πθi (·|hi,t ). A TF pass is applied right after for each
+agent to compute the probability πθi (ai,t |hi,t ) of ai,t under πθi (·|hi,t ). All agents’ responses form a solution to
+the task at ← {a1,t , . . . , an,t }, and the joint policy can be
+constructed by π θ ← {πθi , · · · , πθi }. This joint policy is
+recorded as a behavior policy π θold (at |ht ) ← π θ (at |ht ).
+Executing at yields a joint reward rt from the reward model
+and triggers the evolution of the environment. Users provide new prompts oi,t+1 , and global information is updated as mt+1 . Each agent updates its history as hi,t+1 ←
+{hi,t , ai,t , oi,t+1 }. The prompts, global information, responses, reward, new prompts, new global information, and
+the behavior policy, (ht , mt , at , rt , ot+1 , π θold (at |ht )), are
+stored into the replay buffer B for subsequent training.
+
+5.3. Algorithm
+Fig. 1b and Alg. 1 show the training procedure of CoLLMCC. We first sample a task from D, and initialize prompts
+
+5
+
+3.0
+
+6.0
+
+2.5
+
+2.5
+
+5.0
+
+2.0
+
+2.0
+
+4.0
+
+1.5
+1.0
+
+MAGRPO
+CoLLM-DC
+CoLLM-CC
+
+0.5
+0
+
+1000
+
+2000
+
+3000
+
+Timesteps
+
+4000
+
+1.5
+1.0
+
+MAGRPO
+CoLLM-DC
+CoLLM-CC
+
+0.5
+
+5000
+
+0
+
+(a) Article Summarization | TLDR
+
+1000
+
+2000
+
+3000
+
+Timesteps
+
+6.0
+
+6.0
+
+5.0
+
+5.0
+
+4.0
+
+4.0
+
+3.0
+2.0
+
+MAGRPO
+CoLLM-DC
+CoLLM-CC
+
+1.0
+0
+
+1000
+
+4000
+
+2000
+
+3000
+
+Timesteps
+
+4000
+
+3.0
+2.0
+
+MAGRPO
+CoLLM-DC
+CoLLM-CC
+
+1.0
+
+5000
+
+0
+
+(b) Article Expansion | ArXiv
+
+Return
+
+Return
+
+Return
+
+3.0
+
+Return
+
+Return
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+1500
+
+6000
+
+7500
+
+3.0
+2.0
+
+MAGRPO
+CoLLM-DC
+CoLLM-CC
+
+0
+
+(d) Minecraft Building | StrBuild
+
+4500
+
+Timesteps
+
+(c) Code Generation | CoopHE
+
+1.0
+
+5000
+
+3000
+
+1000
+
+2000
+
+3000
+
+Timesteps
+
+4000
+
+5000
+
+(e) Minecraft Building | HouseBuild
+
+Figure 2. Evaluation results of MAGRPO, CoLLM-DC, and CoLLM-CC across article writing, code generation, and game-playing tasks
+over 5 runs. The y-axis shows expected return, with limits (min/max) indicating the return scale for each task. Curves are smoothed using
+a time-weighted exponential moving average. Shaded regions denote 95% bootstrapped confidence intervals.
+
+At each training epoch, a minibatch β of joint transitions is drawn from B. For each sample indexed by b,
+(hbt , mbt , abt , rtb , obt+1 , mbt+1 , π bθold (abt |hbt )) ∈ β, the TD
+loss Lb (ϕ, mbt ) is calculated according to Equation 5 by
+the structure shown in Fig 1c. The probability πθi (abi,t |hbi,t )
+of each agent under its current policy is calculated by a TF
+pass, which is used to compute policy gradient ∇θi J b (θi )
+according to Eq. 4 in Fig 1a. The gradient of all samples
+in β is averaged to update the centralized critic ϕ and all
+actors θi , ∀i ∈ I, respectively.
+
+sion, the same agents expand paper abstracts from the
+abstract field of arXiv-public-datasets into full introductions, where one outlines the research background and
+motivation and the other presents the proposed methods
+and experiments. The writing quality is evaluated using a
+weighted sum of 3 metrics with task-specific hyperparameters. The structure assesses the length ratio of generated
+responses, encouraging agents to contribute fairly to maximize parallel execution. Style consistency is quantified by a
+Jaccard similarity score to ensure a uniform tone throughout
+the article. Logical coherence is measured by a logarithmic
+function of the frequency of transition words, encouraging
+natural, smooth transitions between paragraphs.
+
+6. Experiments
+We evaluate MAAC on 3 domains: document processing,
+programming, and language-based games. Experiment settings, additional results, the prompt and reward design, resources used, and code are provided in Appendix C, D, E,
+F, G, H, respectively.
+
+Coding Collaboration Leveraging multiple LLM agents
+for collaborative coding has emerged as a promising
+paradigm (Talebirad & Nadiri, 2023; NVIDIA, 2024; Qian
+et al., 2024). We use a code generation task to demonstrate this concept. To test the collaboration between heterogeneous agents, an auxiliary Qwen2.5-Coder-3B assists
+a primary Qwen3-4B-Instruct generator in solving basic
+programming tasks. The auxiliary agent intends to implement lightweight utilities that support the primary agent to
+produce the core logic. As many tasks in HumanEval and
+MBPP (Chen et al., 2021; Austin et al., 2021) are atomic
+and cannot meaningfully benefit from cooperation (e.g.,
+add(x,y)), optimizing collaborative behaviors on such
+instances introduces substantial noise. Therefore, we construct CoopHumanEval dataset (CoopHE), which focuses
+on problems that naturally admit cooperative decomposition.
+
+6.1. Setup
+Writing Collaboration Processing long documents is
+time-consuming, whereas parallel execution among decentralized agents can substantially improve efficiency. We
+frame the common collaborative writing into 2 representative tasks. In TLDR summarization, 2 Qwen3-1.7B agents
+summarize Reddit posts from the prompt field in TLDR.
+One acts as a high-level summarizer producing a concise
+paragraph, and one serves as a detailed summarizer providing more comprehensive information. In arXiv expan6
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+Method
+
+TLDR
+
+arXiv
+
+CoopHE
+
+StrBuild
+
+HouseBuild
+
+Time Cost Score Time Cost Score Time Cost Pass Time Cost Adj
+
+IoU Time Cost
+
+Raw Model
+GRPO
+AC
+
+5.0
+4.1
+4.0
+
+465
+387
+374
+
+30.3
+91.7
+94.7
+
+5.1
+4.2
+4.3
+
+472
+398
+392
+
+44.0
+91.0
+95.3
+
+2.5
+2.5
+2.5
+
+90
+88
+91
+
+36.6 22.6 1016 99.6 43.2
+46.1 22.0 890 100.0 54.6
+49.8 22.2 904 100.0 55.9
+
+Parallel
+Pipeline
+Discussion
+
+2.3
+4.3
+4.6
+
+244
+238
+234
+
+22.7
+21.7
+22.3
+
+2.3
+3.9
+4.8
+
+246
+203
+251
+
+49.0
+57.0
+54.3
+
+2.3
+2.6
+2.9
+
+138 50.0 9.4
+177 62.5 9.8
+191 25.0 10.3
+
+232 15.7 5.9 19.2
+246 12.9 18.7 20.2
+236 16.2 6.5 21.0
+
+502
+488
+510
+
+21.8
+30.6
+27.6
+
+46.1
+41.3
+38.1
+
+MAGRPO
+CoLLM-DC
+CoLLM-CC
+
+1.8
+1.9
+1.8
+
+178
+194
+181
+
+93.5
+95.4
+95.2
+
+2.0
+2.0
+1.9
+
+201
+196
+188
+
+93.1
+94.1
+95.0
+
+2.3
+2.5
+2.6
+
+132 74.3
+161 59.1
+166 75.2
+
+226 13.3 50.6 19.2
+182 7.6 44.6 19.4
+239 7.3 68.5 19.0
+
+446
+470
+442
+
+80.2
+43.8
+86.4
+
+50.9
+46.8
+52.7
+
+56.3 10.6
+61.8 10.3
+62.5 10.3
+
+9.4
+9.3
+9.5
+
+427
+411
+413
+
+0.9
+0.4
+0.4
+
+HP
+
+IoU
+
+Table 1. Response time (seconds), cost (tokens/agent/turn), and performance (%) of MAAC and other baselines (single-model, multi-agent
+test-time interaction, and MA-REINFORCE) on article writing, code generation, and language-based games. Adj denotes the same-texture
+adjacency rate, and HP denotes the average remaining health points. Response time is measured on a NVIDIA GeForce RTX 5090. Bolds
+and underlines indicate the best performance across all baselines and MARL baselines on each dataset. Results are averaged over 5 runs.
+
+(a) StrBuild
+
+Each agent’s resource is limited. The target building is expected to match the exact string while maintaining an even
+material distribution to enhance structural robustness against
+potential threats. HouseBuild involves a higher level of interactivity and stochasticy. The same agents collaboratively
+construct a house that conforms to predefined architectural
+specifications (e.g., Fig. 3b) while defending against attacks
+from hostile mobs (spiders). Since adversaries can actively
+interfere with agents, effective coordination requires allocating effort between construction and threat mitigation.
+StrBuild and HouseBuild unfold in 4 turns, H = 4. A simulated player gives instructions for incomplete building after
+each turn. For StrBuild, we adopt the adjacency rate of sametexture blocks as a task-specific metric, where a lower value
+corresponds to a more evenly distributed texture across the
+buildings. We use the average health point of players as an
+indicator of whether the attacks are successfully repelled in
+HouseBuild. Intersection over Union (IoU) is an evaluation
+metric for both building tasks, with higher values indicating
+greater compliance with the given specifications.
+
+(b) HouseBuild
+
+Figure 3. Screenshots of building tasks in Minecraft. (a) StrBuild: The LLM agent with wood outputs a /setblock 12
+5 5 minecraft:birch planks game instruction to complete the building in “ICML” shape. (b) HouseBuild: The LLM
+agent outputs /damage @e[type=spider,limit=1] 6
+minecraft:player attack to attack a mob, while building a cubic concrete house with a wooden door, 4 obsidian pillars,
+and a triangular-prism stone roof.
+
+In CoopHE, the auxiliary function is named aux, and the
+main function signature is provided in the prompt field
+of the problem description. Agents interact in a multi-turn
+environment, H = 2. Agents’ outputs are concatenated into
+a joint program. They receive feedback from static analysis
+(abstract syntax trees) or dynamic execution (sandbox tests),
+then proceed to the next turn. The episode terminates if the
+program passes all tests and the main effectively utilizes
+the auxiliary function. We use the average pass rate as the
+evaluation metric. Pass@k results are shown in Appendix D.
+
+We evaluate the performance of CoLLM-DC and CoLLMCC against 3 categories of baselines: single-model methods,
+multi-agent test-time interaction, and other MARL methods.
+
+Language-based Games Language-based games comprise diverse, flexible interactive environments, where
+agents act and coordinate via language instructions (Sarkar
+et al., 2025; Zhu et al., 2025). We consider 2 tasks from
+Minecraft to evaluate LLM collaboration. In StrBuild, a
+Qwen2.5-3B-Instruct and a Qwen3-4B-Instruct agents collaboratively construct string-like structures (e.g., “ICML” in
+Fig. 3a). Each agent is provided with 2 different block types
+from wood, stone, concrete, and obsidian, each exhibiting
+distinct properties, e.g., accessibility, defensive capability.
+
+Single-Model Methods Single-model baselines contain
+the results from a larger base model or its fine-tuned variants. We select a comparable-size model as the sum of MAS:
+Qwen3-4B-Instruct for writing tasks, Qwen2.5-7B Coder
+and Instruct models for code generation and Minecraft
+game-playing, respectively. The reward model is same as
+that used in MARL methods, except for metrics specifically
+designed for cooperation. We set all single-model baselines
+to be single-turn, as the external feedback for single-model
+and multi-agent approaches differ significantly.
+
+6.2. Baselines
+
+7
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+Multi-Agent Test-Time Interaction Methods We compare our method against 3 prompt-based multi-agent interaction baselines, where the same agents operate only through
+prompts (Wu et al., 2023). In the parallel baseline, agents
+act independently without explicit communication. The
+sequential pipeline baseline represents a one-way communication setting where agents act in turn and can later observe
+the inputs and outputs of earlier agents. The discussion
+baseline frames the multi-agent debate (Du et al., 2023),
+where agents engage in two-way, asynchronous communication. Each agent can access the others’ outputs in the next
+turn and generate its response accordingly. The number
+of message-passing rounds is the same among multi-agent
+methods, and we keep the prompt adjustment minimal.
+
+yields limited improvement, as coding logics vary substantially across training and test problems and no general strategy consistently improves pass rates across diverse tasks.
+Parallel execution and one-round discussion perform poorly,
+as agents lack timely information to accurately assess the
+correctness and functionality of others’ functions. Sequential generation achieves performance comparable to the
+single-model baseline but incurs substantially higher inference latency because agents must wait for others’ responses
+before proceeding. With K = 4, MAGRPO achieves comparably high pass rates as CoLLM-CC. The main generator
+provides fallback solutions for potential vulnerabilities in
+the auxiliary, and it effectively uses external feedback to
+correct errors. However, MAGRPO requires significantly
+more samples to converge in Fig. 2c, reaching stability at
+approximately 5000 timesteps, compared to 2000 timesteps
+for CoLLM-CC. CoLLM-DC exhibits oscillations in later
+stages (4500 timesteps) and thus cannot perform well. This
+instability is caused by sparse rewards in code generation,
+where a single incorrect token can invalidate functionality
+and induce abrupt reward drops.
+
+MARL Methods We compare CoLLM-DC and CoLLMCC with a representative MA-REINFORCE approach (Section 4.1), Multi-Agent Group Relative Policy Optimization
+(MAGRPO) (Liu et al., 2026a). In MAGRPO, the group
+Pk
+1
+k
+relative baseline bgrp (ht ) = K
+k=1 Gt is the average
+1
+K
+return for K i.i.d. responses {a , · · · , a } on each ht . We
+set K = 4 for short-horizon writing and coding tasks, and
+K = 2 for Minecraft tasks due to the rapid increase in the
+number of required samples (Proposition 4.3). The same
+learning rate is applied to update each sample across all 3
+methods to ensure a fair comparison of sample efficiency
+(Appendix D). We use the turn index and task completion
+progress as mt in both CC and DC for consistency, though
+such mt is often unavailable to DC in standard MARL.
+
+In Minecraft games, the fine-tuned single model achieves
+the lowest same-texture adjacency rate in StrBuild and the
+highest remaining health points in HouseBuild, as it does
+not need to infer other agents’ material choices or attack
+behavior. Prompt-based multi-agent methods perform particularly poorly in this domain, likely because the raw models Qwen2.5-3B-Instruct and Qwen3-4B-Instruct are not
+optimized with Minecraft building instructions. CoLLMCC achieves the best IoU in StrBuild by leveraging external hints and outperforms all methods except the single
+model fine-tuned by AC in HouseBuild. In Fig 2d and 2e,
+MAGRPO and CoLLM-DC perform substantially worse
+than CoLLM-CC. Due to the rapid growth of rollout tree, a
+smaller sampling K = 2 is needed, leading to slower convergence and higher variance. CoLLM-DC fails to converge
+on these tasks since non-stationarity accumulates across 4
+turns, leading to more unstable value estimates.
+
+6.3. Evaluation Results
+The performance comparison between MARL methods and
+other baselines is present in Table 1, where the evaluation curves of MAGRPO (blue), CoLLM-DC (green), and
+CoLLM-CC (red) are presented in Fig. 2.
+In writing tasks, single-model methods achieve strong performance but have low inference speed and high cost due
+to their larger model size. Since the raw models are not
+specifically optimized with coordination-centric objectives,
+prompt-based multi-agent methods produce solutions with
+low quality. Both RL and MARL fine-tuning guide agents to
+generate concise, high-quality content, leading to shorter response times, lower token usage, and improved performance.
+MAGRPO and CoLLM-CC achieve similar performance
+after convergence, indicating that K = 4 samples are sufficient for accurate value estimation. MAGRPO has slightly
+higher variance and lower sample efficiency, as shown by a
+larger shaded region and slower convergence in Fig. 2a and
+2b. CoLLM-DC struggles to achieve stable convergence in
+arXiv expansion, as DC based on local information cannot
+provide stationary signals for gradient estimates.
+
+7. Conclusion
+Decentralized LLM collaboration accelerates inference and
+enables flexible deployment, making it promising. We
+developed centralized critic (CoLLM-CC) and decentralized critic (CoLLM-DC) methods to optimize cooperation
+among decentralized LLMs. Evaluations on writing, coding,
+and game-playing tasks show that MARL-based methods
+can achieve equal or better performance than a single larger
+model. Among MARL methods, MA-REINFORCE and
+CoLLM-DC struggle in long-horizon, sparse-reward settings due to low sample efficiency and convergence issues,
+while CoLLM-CC achieves the best performance with the
+lowest variance and highest sample efficiency.
+
+In coding collaboration, fine-tuning Qwen2.5-Coder-7B
+8
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+8. Acknowledgment
+
+Chen, Y., Yan, L., Sun, W., Ma, X., Zhang, Y., Wang, S., Yin,
+D., Yang, Y., and Mao, J. Improving retrieval-augmented
+generation through multi-agent reinforcement learning.
+arXiv preprint arXiv:2501.15228, 2025.
+
+This work was partially funded by NSF grants #2044993 and
+#2409351. It used Delta and DeltaAI computing resources
+at the National Center for Supercomputing Applications
+through allocation CIS251326 from the Advanced Cyberinfrastructure Coordination Ecosystem: Services & Support program, which is supported by NSF grants #2138259,
+#2138286, #2138307, #2137603, and #2138296. This work
+was completed in part using the Explorer Cluster, supported
+by Northeastern University’s Research Computing team.
+Shuo Liu received computing support from Lambda’s Research Grant Program.
+
+De Witt, C. S., Gupta, T., Makoviichuk, D., Makoviychuk,
+V., Torr, P. H., Sun, M., and Whiteson, S. Is independent learning all you need in the starcraft multi-agent
+challenge? arXiv preprint arXiv:2011.09533, 2020.
+Ding, Z. and Ye, W. Treegrpo: Tree-advantage grpo for
+online rl post-training of diffusion models. arXiv preprint
+arXiv:2512.08153, 2025.
+Douillard, A., Feng, Q., Rusu, A. A., Chhaparia, R.,
+Donchev, Y., Kuncoro, A., Ranzato, M., Szlam, A., and
+Shen, J. Diloco: Distributed low-communication training
+of language models. arXiv preprint arXiv:2311.08105,
+2023.
+
+References
+Achiam, J., Adler, S., Agarwal, S., et al. Gpt-4 technical
+report. arXiv preprint arXiv:2303.08774, 2023.
+Ahmadian, A., Cremer, C., Gallé, M., Fadaee, M., Kreutzer,
+J., Pietquin, O., Üstün, A., and Hooker, S. Back to basics: Revisiting reinforce style optimization for learning from human feedback in LLMs. arXiv preprint
+arXiv:2402.14740, 2024.
+
+Du, Y., Li, S., Torralba, A., Tenenbaum, J. B., and Mordatch, I. Improving factuality and reasoning in language models through multiagent debate. arXiv preprint
+arXiv:2305.14325, 2023.
+Estornell, A. and Liu, Y. Multi-LLM debate: Framework,
+principals, and interventions. In NeurIPS, 2024.
+
+Albrecht, S. V., Christianos, F., and Schäfer, L. MultiAgent Reinforcement Learning: Foundations and Modern
+Approaches. MIT Press, 2024. URL https://www.
+marl-book.com.
+
+Feng, S., Wang, Z., Goyal, P., Wang, Y., Shi, W., Xia, H.,
+Palangi, H., Zettlemoyer, L., Tsvetkov, Y., Lee, C.-Y.,
+et al. Heterogeneous swarms: Jointly optimizing model
+roles and weights for multi-LLM systems. arXiv preprint
+arXiv:2502.04510, 2025.
+
+Anil, R., Borgeaud, S., Alayrac, J.-B., Yu, J., Soricut, R.,
+Schalkwyk, J., Dai, A. M., Hauth, A., Millican, K., et al.
+Gemini: a family of highly capable multimodal models.
+arXiv preprint arXiv:2312.11805, 2023.
+
+Foerster, J., Farquhar, G., Afouras, T., Nardelli, N., and
+Whiteson, S. Counterfactual multi-agent policy gradients. In Proceedings of the AAAI Conference on Artificial
+Intelligence, April 2018.
+
+Austin, J., Odena, A., Nye, M., Bosma, M., Michalewski,
+H., Dohan, D., Jiang, E., Cai, C., Terry, M., Le, Q., et al.
+Program synthesis with large language models. arXiv
+preprint arXiv:2108.07732, 2021.
+
+Gao, Y., Song, Z., and Yin, J. Gradientcoin: A peer-topeer decentralized large language models. arXiv preprint
+arXiv:2308.10502, 2023.
+
+Bai, J., Bai, S., Chu, Y., Cui, Z., Dang, K., Deng, X., Fan,
+Y., Ge, W., Han, Y., Huang, F., et al. Qwen technical
+report. arXiv preprint arXiv:2309.16609, 2023.
+
+Ghosh, S. Distributed systems: an algorithmic approach.
+Chapman and Hall/CRC, 2006.
+
+Cemri, M., Pan, M. Z., Yang, S., Agrawal, L. A., Chopra,
+B., Tiwari, R., Keutzer, K., Parameswaran, A., Klein, D.,
+Ramchandran, K., et al. Why do multi-agent llm systems
+fail? arXiv preprint arXiv:2503.13657, 2025.
+
+Guo, D., Yang, D., Zhang, H., et al. Deepseek-r1 incentivizes reasoning in LLMs through reinforcement learning. Nature, 645(8081):633–638, 2025. doi: 10.1038/
+s41586-025-09422-z.
+
+Chen, M., Tworek, J., Jun, H., et al. Evaluating large
+language models trained on code. arXiv preprint
+arXiv:2107.03374, 2021.
+
+Hong, H., Yin, J., Wang, Y., Liu, J., Chen, Z., Yu, A.,
+Li, J., Ye, Z., Xiao, H., Chen, Y., et al. Multi-agent
+deep research: Training multi-agent systems with m-grpo.
+arXiv preprint arXiv:2511.13288, 2025.
+
+Chen, Y., Arkin, J., Zhang, Y., Roy, N., and Fan, C. Scalable
+multi-robot collaboration with large language models:
+Centralized or decentralized systems? In 2024 IEEE
+International Conference on Robotics and Automation
+(ICRA), pp. 4311–4317. IEEE, 2024.
+
+Hu, J., Liu, J. K., Xu, H., and Shen, W. Reinforce++:
+Stabilizing critic-free policy optimization with global
+advantage normalization, 2025.
+9
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+Huang, Y., Cheng, Y., Bapna, A., Firat, O., Chen, D., Chen,
+M., Lee, H., Ngiam, J., Le, Q. V., Wu, Y., et al. Gpipe:
+Efficient training of giant neural networks using pipeline
+parallelism. Advances in neural information processing
+systems, 32, 2019.
+
+Liu, X., Yu, H., Zhang, H., Xu, Y., Lei, X., Lai, H., Gu, Y.,
+Ding, H., Men, K., Yang, K., et al. Agentbench: Evaluating llms as agents. arXiv preprint arXiv:2308.03688,
+2023.
+
+Ji, Y., Ma, Z., Wang, Y., Chen, G., Chu, X., and Wu, L.
+Tree search for llm agent reinforcement learning. arXiv
+preprint arXiv:2509.21240, 2025.
+
+Lowe, R., Wu, Y. I., Tamar, A., Harb, J., Abbeel, P., and Mordatch, I. Multi-agent actor-critic for mixed cooperativecompetitive environments. Advances in neural information processing systems, 30, 2017.
+
+Konda, V. and Tsitsiklis, J. Actor-critic algorithms. In Solla,
+S., Leen, T., and Müller, K. (eds.), Advances in Neural
+Information Processing Systems, volume 12. MIT Press,
+1999.
+
+Lyu, X., Xiao, Y., Daley, B., and Amato, C. Contrasting
+centralized and decentralized critics in multi-agent reinforcement learning. arXiv preprint arXiv:2102.04402,
+2021.
+
+Lee, K. M., Ganapathi Subramanian, S., and Crowley, M.
+Investigation of independent reinforcement learning algorithms in multi-agent environments. Frontiers in Artificial
+Intelligence, 5:805823, 2022.
+
+Lyu, X., Baisero, A., Xiao, Y., Daley, B., and Amato, C. On
+centralized critics in multi-agent reinforcement learning.
+Journal of Artificial Intelligence Research, 77:295–354,
+2023.
+
+Lepikhin, D., Lee, H., Xu, Y., Chen, D., Firat, O., Huang, Y.,
+Krikun, M., Shazeer, N., and Chen, Z. Gshard: Scaling
+giant models with conditional computation and automatic
+sharding. arXiv preprint arXiv:2006.16668, 2020.
+
+NVIDIA. Introduction to llm agents, 2024. URL
+https://developer.nvidia.com/blog/
+introduction-to-llm-agents/.
+Oliehoek, F. A. and Amato, C. A Concise Introduction to
+Decentralized POMDPs. Springer, 2016. doi: 10.1007/
+978-3-319-28929-8.
+
+Li, Z., Xu, T., Zhang, Y., Yu, Y., Sun, R., and Luo, Z.Q. Remax: A simple, effective, and efficient method
+for aligning large language models. arXiv preprint
+arXiv:2310.10505, 2023.
+
+Peshkin, L., Kim, K.-E., Meuleau, N., and Kaelbling, L. P.
+Learning to cooperate via policy search. arXiv preprint
+cs/0105032, 2001.
+
+Liao, J., Wen, M., Wang, J., and Zhang, W. Marft:
+Multi-agent reinforcement fine-tuning. arXiv preprint
+arXiv:2504.16129, 2025.
+
+Qi, M., Zhu, T., Zhang, L., Li, N., and Zhou, W. Towards
+transparent and incentive-compatible collaboration in decentralized llm multi-agent systems: A blockchain-driven
+approach. arXiv preprint arXiv:2509.16736, 2025.
+
+Lifshitz, S., McIlraith, S. A., and Du, Y. Multi-agent verification: Scaling test-time compute with multiple verifiers.
+arXiv preprint arXiv:2502.20379, 2025.
+
+Qian, C., Liu, W., Liu, H., Chen, N., Dang, Y., Li, J., Yang,
+C., Chen, W., Su, Y., Cong, X., et al. Chatdev: Communicative agents for software development. In Proceedings of the 62nd Annual Meeting of the Association for
+Computational Linguistics (Volume 1: Long Papers), pp.
+15174–15186, 2024.
+
+Liu, B., Guertler, L., Yu, S., Liu, Z., Qi, P., Balcells, D.,
+Liu, M., Tan, C., Shi, W., Lin, M., et al. Spiral: Selfplay on zero-sum games incentivizes reasoning via multiagent multi-turn reinforcement learning. arXiv preprint
+arXiv:2506.24119, 2025a.
+Liu, M., Jiang, L., Liang, Y., Du, S. S., Choi, Y., Althoff, T.,
+and Jaques, N. Chasing moving targets with online selfplay reinforcement learning for safer language models.
+arXiv preprint arXiv:2506.07468, 2025b.
+
+Rashid, T., Samvelyan, M., de Witt, C. S., Farquhar, G.,
+Foerster, J., and Whiteson, S. Monotonic value function
+factorisation for deep multi-agent reinforcement learning.
+Journal of Machine Learning Research, 21(178):1–51,
+2020.
+
+Liu, S., Liang, Z., Lyu, X., and Amato, C. LLM collaboration with multi-agent reinforcement learning. In Proceedings of the 40th Annual AAAI Conference on Artificial
+Intelligence, 2026a.
+
+Sarkar, B., Xia, W., Liu, C. K., and Sadigh, D. Training
+language models for social deduction with multi-agent
+reinforcement learning. arXiv preprint arXiv:2502.06060,
+2025.
+
+Liu, S.-Y., Dong, X., Lu, X., Diao, S., Belcak, P., Liu,
+M., Chen, M.-H., Yin, H., Wang, Y.-C. F., Cheng, K.-T.,
+et al. Gdpo: Group reward-decoupled normalization policy optimization for multi-reward rl optimization. arXiv
+preprint arXiv:2601.05242, 2026b.
+
+Shao, Z., Wang, P., Zhu, Q., et al. Deepseekmath: Pushing
+the limits of mathematical reasoning in open language
+models. arXiv preprint arXiv:2402.03300, 2024.
+10
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+Shoham, Y. and Leyton-Brown, K. Multiagent Systems:
+Algorithmic, Game-Theoretic, and Logical Foundations.
+Cambridge University Press, Cambridge, UK, 2009.
+
+Wu, L., Liu, X., Shi, T., Ye, Z., and Song, D. Deserve:
+Towards affordable offline llm inference via decentralization. arXiv preprint arXiv:2501.14784, 2025a.
+
+Skreta, M., Yoshikawa, N., Arellano-Rubach, S., Ji, Z.,
+Kristensen, L. B., Darvish, K., Aspuru-Guzik, A., Shkurti,
+F., and Garg, A. Errors are useful prompts: Instruction
+guided task programming with verifier-assisted iterative
+prompting. arXiv preprint arXiv:2303.14100, 2023.
+
+Wu, Q., Bansal, G., Zhang, J., Wu, Y., Li, B., Zhu, E., Jiang,
+L., Zhang, X., Zhang, S., Liu, J., Awadallah, A. H., White,
+R. W., Burger, D., and Wang, C. Autogen: Enabling nextgen llm applications via multi-agent conversation. arXiv
+preprint arXiv:2308.08155, 2023.
+
+Stone, P. and Veloso, M. Multiagent systems: A survey from
+a machine learning perspective. Autonomous Robots, 8
+(3):345–383, July 2000.
+
+Wu, S., Galley, M., Peng, B., Cheng, H., Li, G., Dou, Y.,
+Cai, W., Zou, J., Leskovec, J., and Gao, J. Collabllm:
+From passive responders to active collaborators. arXiv
+preprint arXiv:2502.00640, 2025b.
+Yang, J., Jimenez, C. E., Wettig, A., Lieret, K., Yao,
+S., Narasimhan, K., and Press, O. Swe-agent: Agentcomputer interfaces enable automated software engineering. Advances in Neural Information Processing Systems,
+37:50528–50652, 2024.
+
+Subramaniam, V., Du, Y., Tenenbaum, J. B., Torralba, A.,
+Li, S., and Mordatch, I. Multiagent finetuning: Self improvement with diverse reasoning chains. arXiv preprint
+arXiv:2501.05707, 2025.
+Sunehag, P., Lever, G., Gruslys, A., Czarnecki, W. M., Zambaldi, V., Jaderberg, M., Lanctot, M., Sonnerat, N., Leibo,
+J. Z., Tuyls, K., et al. Value-decomposition networks
+for cooperative multi-agent learning. arXiv preprint
+arXiv:1706.05296, 2017.
+
+Yang, Y., Chai, H., Shao, S., Song, Y., Qi, S., Rui, R.,
+and Zhang, W. Agentnet: Decentralized evolutionary
+coordination for llm-based multi-agent systems. arXiv
+preprint arXiv:2504.00587, 2025a.
+
+Sutton, R. S. and Barto, A. G. Reinforcement Learning: An
+Introduction. MIT Press, 1998.
+
+Yang, Z., Guo, Z., Huang, Y., Liang, X., Wang, Y., and
+Tang, J. Treerpo: Tree relative policy optimization. arXiv
+preprint arXiv:2506.05183, 2025b.
+Yao, S., Zhao, J., Yu, D., Du, N., Shafran, I., Narasimhan,
+K. R., and Cao, Y. React: Synergizing reasoning and
+acting in language models. In The eleventh international
+conference on learning representations, 2022.
+
+Talebirad, Y. and Nadiri, A. Multi-agent collaboration:
+Harnessing the power of intelligent llm agents. arXiv
+preprint arXiv:2306.03314, 2023.
+Uesato, J., Kushman, N., Kumar, R., Song, F., Siegel, N.,
+Wang, L., Creswell, A., Irving, G., and Higgins, I. Solving math word problems with process-and outcome-based
+feedback. arXiv preprint arXiv:2211.14275, 2022.
+
+Yu, C., Velu, A., Vinitsky, E., Gao, J., Wang, Y., Bayen,
+A., and Wu, Y. The surprising effectiveness of ppo in
+cooperative multi-agent games. In Advances in Neural
+Information Processing Systems, volume 35, pp. 24611–
+24624. Curran Associates, Inc., 2022.
+
+Van der Hoek, W. and Wooldridge, M. Multi-agent systems.
+Foundations of Artificial Intelligence, 3:887–928, 2008.
+
+Yue, Y., Chen, Z., Lu, R., Zhao, A., Wang, Z., Song, S., and
+Huang, G. Does reinforcement learning really incentivize
+reasoning capacity in llms beyond the base model? arXiv
+preprint arXiv:2504.13837, 2025.
+
+Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones,
+L., Gomez, A. N., Kaiser, Ł., and Polosukhin, I. Attention is all you need. Advances in neural information
+processing systems, 30, 2017.
+
+Zhang, K., Liu, R., Zhu, X., Tian, K., Zeng, S., Jia, G., Fan,
+Y., Lv, X., Zuo, Y., Jiang, C., Liu, Z., Wang, J., Wang,
+Y., Zhao, R., Hua, E., Wang, Y., Wang, S., Gao, J., Long,
+X., Sun, Y., Ma, Z., Cui, G., Bai, L., Ding, N., Qi, B.,
+and Zhou, B. MARTI: a framework for multi-agent LLM
+systems reinforced training and inference, 2025.
+
+Waldo, J., Wyant, G., Wollrath, A., and Kendall, S. A note
+on distributed computing. In International Workshop on
+Mobile Object Systems, pp. 49–64. Springer, 1996.
+Wang, J., Ren, Z., Liu, T., Yu, Y., and Zhang, C. Qplex: Duplex dueling multi-agent q-learning. In Proceedings of the
+International Conference on Learning Representations,
+2021.
+
+Zhu, K., Du, H., Hong, Z., Yang, X., Guo, S., Wang, D. Z.,
+Wang, Z., Qian, C., Tang, R., Ji, H., et al. Multiagentbench: Evaluating the collaboration and competition of
+LLM agents. In Proceedings of the 63rd Annual Meeting
+of the Association for Computational Linguistics (Volume
+1: Long Papers), pp. 8580–8622, 2025.
+
+Weiss, G. Multiagent systems: a modern approach to distributed artificial intelligence. MIT press, 1999.
+11
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+A. Proofs
+
+For agent i at time t, define
+
+Here we provide the full proofs for the propositions in our
+paper.
+
+k
+gi,t
+= ρki,t ∇θi log πθi (aki,t | hi,t ) Gkt .
+
+Then, by variance decomposition, we have
+
+A.1. Proof of Proposition 4.1
+
+Var(ḡi,t | hi,t )
+
+Proposition. For each history ht at t, t ∈ [0, H), suppose
+agents sample K ≥ 1 i.i.d. joint actions {a1t , · · · , aK
+t } from
+π(·|ht ). For each akt , an independent K-ary rollout tree
+is produced to estimate the corresponding expected Monte
+Carlo return Gkt . For agent i, define ḡi,t as the averaged
+gradient estimate over {a1i,t , · · · , aK
+i,t },
+
+K
+
+1 X k
+= Var
+gi,t | hi,t
+K
+=
+
+k=1
+
+∗
+Then ḡi,t is unbiased for the true gradient term gi,t
+,
+ ∗
+
+Eπ [ḡi,t | hi,t ] = Eπ gi,t | hi,t .
+
+Proof. We show that the expectation of gradient estimates
+ḡi,t of K-sampling MA-REINFORCE (K ≥ 2) is equal to
+1
+gi,t
+of MA-REINFORCE with K = 1.
+k
+gi,t
+= ρki,t ∇θi log πθi (aki,t | hi,t ) Gkt .
+
+By linearity of expectation,
+K
+
+1 X ℓ
+Gt+1 | hki,t
+K
+
+#
+
+ℓ=1
+
+1
+=
+K
+
+K
+X
+
+h
+
+k=1
+
+
+
+2
+k
+Var gi,t
+| hi,t + 2
+K
+
+=
+
+i
+
+Eπ Gℓt+1 | hki,t ,
+
+1
+1
+K (K H−1−t )2
+
+K H−1−t
+X
+
+X
+
+k
+l
+Cov gi,t
+, gi,t
+| hi,t
+
+
+
+1≤k<l≤K
+
+2
+2
++
+K (K H−1−t )2
+
+where ℓ denotes the sampling index at t + 1. Since at the
+k
+k
+terminal step t = H − 1, GkH−1 = rH−1
+, and gi,H−1
+is
+k
+unbiased. We can derive backward that gi,t is unbiased for
+all t and k. Thus, according to Theorem 1 of (Peshkin et al.,
+1
+2001), ḡi,t = gi,t
+is unbiased.
+
+
+
+Var ρki,t ∇θi log πθi (aki,t | hi,t ) Gleaf
+| hki,t
+t
+
+leaf=1
+
+ℓ=1
+
+K H−1−t
+X
+
+
+
+leaf 1
+leaf 2
+Cov gi,t
+, gi,t
+| hki,t
+
+1≤leaf 1≤leaf 2≤K
+
+1
+K
+Assuming the {gi,t
+, · · · , gi,t
+} and are independent,1
+leaf 1 leaf 2 k
+, gi,t |hi,t ) = 0.
+Cov(gi,t
+
+Thus, we have,
+
+A.2. Proof of Proposition 4.2
+
+Var(ḡi,t | hi,t )
+
+1
+= H−t Var ρki,t ∇θi log πθi (aki,t | hi,t ) Gleaf
+| hki,t
+t
+K
+σ2
+= H−t
+K
+
+Proposition. Under the setting of Proposition 4.1, for
+any history hi,t , we assume the gradient estimates for
+{a1i,t , · · · , aK
+i,t } are independent and episodes are not terminated early. Let σ 2 be the gradient estimate variance when
+K = 1, the variance of ḡi,t satisfies,
+Varπ (ḡi,t | hi,t ) =
+
+
+
+Var(ḡi,t | hi,t )
+
+
+1
+k
+= Var gi,t
+| hi,t
+K
+
+
+1
+= Var ρki,t ∇θi log πθi (aki,t | hi,t ) Gkt | hki,t
+K
+!
+K
+1
+1 X ℓ
+k
+k
+k
+= Var ρi,t ∇θi log πθi (ai,t | hi,t )
+Gt+1 | hi,t
+K
+K
+ℓ=1
+!
+PK H−1−t leaf
+GH−1
+1
+k
+k
+k
+leaf=1
+| hi,t
+= Var ρi,t ∇θi log πθi (ai,t | hi,t )
+K
+K H−1−t
+
+For agent i at time t, define
+
+"
+
+1
+K2
+
+K
+X
+
+where k and l are different i.i.d. samples at t. Since
+k
+l
+{a1i,t , · · · , aK
+i,t } are i.i.d., we have Cov(gi,t , gi,t |hi,t ) = 0.
+Assuming the episode is not terminated early, at t + 1,
+we have ℓ new rollouts for each aki,t , and so on, we have
+leaf = K H−1−t leaf nodes and returns at t = H − 1.
+
+1 X k
+ρi,t ∇θi log πθi (aki,t | hi,t ) Gkt .
+K
+
+h
+i
+Eπ Gkt | hki,t = Eπ
+
+,
+
+k=1
+
+K
+
+ḡi,t =
+
+!
+
+σ2
+.
+K H−t
+
+Proof. We show that, when the episodes are not terminated
+early and expand into a full K-ary tree, and assuming gradient estimates are independent for {a1i,t , · · · , aK
+i,t }, the variK
+ance of gi,t
+scales inversely with K.
+
+1
+
+However, this independent gradient assumption is usually hard
+to satisfy in Dec-POMDP, because dialog histories with the same
+prefixes usually have positively correlated values.
+
+12
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+B. CoLLM-DC
+
+C.1. Datasets
+We list the preprocessed datasets we used for our training.
+
+Algorithm 2: CoLLM-DC
+1: Input: Taskset D, LLM agents {πθi }i∈I , decentralized
+
+• Writing Collaboration
+
+LLM critics {Vϕi }i∈I , learning rates απ , αV , discount
+γ, horizon H, replay buffer B, training epochs E
+2: for each episode do
+3:
+Roll out same as CoLLM-CC in Alg. 1 (line 3-15)
+4:
+for training epoch e = 1, · · · , E do
+5:
+Sample a minibatch of joint transitions β from B
+6:
+for each agent i ∈ I do
+for each sample agent i’s transition βi ,
+7:
+(hbi,t , mbt , abi,t , rtb , obi,t+1 , mbt+1 πθbi ,old (abi,t |hbi,t ))
+∈ βi do
+8:
+Calculate TD loss Lbi (ϕi ) (Eq. 3)
+9:
+Calculate πθi (abi,t |hbi,t ) with TF
+10:
+Calculate ∇θi J b (θi ) (Eq. 2)
+11:
+end for
+P
+1
+b
+12:
+Update critic ϕi ← ϕi − αV |β|
+b ∇ϕi Li (ϕi )
+P
+1
+b
+13:
+Update actor θi ← θi + απ |β| b ∇θi J (θi )
+14:
+end for
+15:
+end for
+16: end for
+17: Output: {πθi }i∈I
+
+– Training set:
+* TLDR[0:1000]
+* arXiv[0:1000]
+– Test set:
+* TLDR[1000:1100]
+* arXiv[1000:1100]
+• Code Collaboration
+– Training set: CoopHE[0:66]
+– Test set: CoopHE[66:82]
+• Minecraft Game-Playing
+– Training set:
+* StrBuild[0:8]
+* HouseBuild[0:8]
+– Test set:
+* StrBuild[8:10]
+* HouseBuild[8:10]
+C.2. Architectures
+
+Fig. 4 and Alg. 2 show the training procedure of CoLLMDC. The rollout and actor updates are the same as those
+in CoLLM-CC (Alg. 1). The only difference is in the
+training phase. In each training epoch, a minibatch βi
+of joint transitions is drawn from B. For each sample,
+(hbi,t , mbt , abi,t , rtb , obi,t+1 , mbt+1 πθbi ,old (abi,t |hbi,t )) ∈ βi , each
+agent i computes its own TD loss Lbi (ϕi ) using a decentralized critic conditioned only on its local history, following
+the structure shown in Fig. 4c. The probability πθi (abi,t |hbi,t )
+under the current policy is computed by a TF pass and is
+used to calculate the policy gradient ∇θi J b (θi ) according
+to Eq.2 in Fig.4a. The gradients of all samples in βi are
+averaged to update each agent’s critic ϕi and actor θi independently, ∀i ∈ I.
+
+We list the architectures of the agent and critic models used
+in our training.
+• Writing Collaboration
+– Agents
+* Qwen3-1.7B
+* Qwen3-1.7B
+– Critic (if applicable): Qwen3-1.7B
+– Temperature: 0.7
+– Top-p: 0.9
+– Top-k: null
+– Max output tokens: 256
+• Code Collaboration
+
+It is noteworthy that the CoLLM-DC architecture in Fig. 4
+has an efficient variant based on parameter sharing. Unlike
+CoLLM-CC, the agents in Fig. 4a and Fig. 4c learn the same
+latent representation z(hi,t ), and thus can potentially share
+a single model to accelerate learning. However, because
+the optimization objectives in Eq. 3 and 2 are different,
+such parameter sharing may introduce gradient interference
+during training.
+
+– Agents
+* Qwen2.5-Coder-3B
+* Qwen3-4B-Instruct-2507
+– Critic (if applicable): Qwen2.5-Coder-3B
+– Temperature: 0.6
+– Top-p: 0.6
+– Top-k: null
+– Max output tokens: 256
+
+C. Experimental Settings
+
+• Minecraft Game-Playing
+
+We introduce the experimental settings in Fig. 2 and Table 1.
+13
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
++
+
+KV-Cache
+
+-
+
++
+
+...
+
+Critic
+
+Transformer
+Blocks
+
+-
+
+KV-Cache
+
+Critic
+
+Transformer
+Blocks
+
+Replay Buffer
+
+-Head
+
+-Head
+Agent
+
+(a)
+
+...
+
+Agent
+
+(b)
+
+(c)
+
+Figure 4. CoLLM-DC framework: (a) The agent structure; (b) The overall decentralized-critic architecture; (c) The critic structure.
+
+– Agents
+* Qwen2.5-3B-Instruct
+* Qwen3-4B-Instruct-2507
+– Critic (if applicable): Qwen3-4B-Instruct-2507
+– Temperature: 0.6
+– Top-p: 0.6
+– Top-k: null
+– Max output tokens
+* StrBuild: 256
+* HouseBuild: 512
+
+– Number of generations: 4
+– Rollout buffer size
+* MAGRPO: 16
+* CoLLM-DC/CoLLM-CC: 4
+– Number of train epochs
+* MAGRPO: 8
+* CoLLM-DC/CoLLM-CC: 80
+– Agent learning rate
+−5
+* MAGRPO: 2 × 10
+−6
+* CoLLM-DC/CoLLM-CC: 5 × 10
+– Critic learning rate (if applicable): 3 × 10−6
+– Advantage clip: 0.2
+– Number of evaluation samples: 4
+
+C.3. Hyperparameters
+We show the key hyperparameters used in MAGRPO,
+CoLLM-DC, and CoLLM-CC.
+
+• Minecraft Game-Playing
+
+• Writing Collaboration
+
+– Number of turns: 4
+– Number of generations: 2
+– Rollout buffer size
+* MAGRPO: 2
+* CoLLM-DC/CoLLM-CC: 1
+– Number of train epochs
+* MAGRPO: 16
+* CoLLM-DC/CoLLM-CC: 120
+– Agent learning rate
+* MAGRPO:
+· StrBuild: 5 × 10−6
+· HouseBuild: 1 × 10−5
+* CoLLM-DC/CoLLM-CC:
+· StrBuild: 2.5 × 10−6
+
+– Number of turns: 1
+– Number of generations: 4
+– Rollout buffer size: 4
+– Number of train epochs
+* MAGRPO: 2
+* CoLLM-DC/CoLLM-CC: 20
+– Agent learning rate: 5 × 10−6
+– Critic learning rate (if applicable): 3 × 10−6
+– Advantage clip: 0.2
+– Number of evaluation samples: 4
+• Code Collaboration
+– Number of turns: 2
+14
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+· HouseBuild: 5 × 10−6
+– Critic learning rate (if applicable):
+* CoLLM-DC/CoLLM-CC:
+· StrBuild: 1.5 × 10−6
+· HouseBuild: 3 × 10−6
+– Advantage clip: 0.05
+– Number of evaluation samples: 2
+
+performs worse than CoLLM-CC and MAGRPO due to
+non-convergence (Fig. 2c).
+D.2. Training Overhead
+We use the setting of CoopHE in Appendix C as a representative to compare MARL training overhead.
+
+D. Additional Results
+We provide additional results in our experiments.
+D.1. Pass@k Results on CoopHE
+Method
+
+Pass@1 Pass@3 Pass@5 Pass@10
+
+Single-Agent
+GRPO
+AC
+
+56.3
+61.8
+62.2
+
+58.7
+62.0
+62.6
+
+61.9
+62.2
+63.0
+
+62.5
+62.8
+63.3
+
+Parallel
+Pipeline
+Discussion
+
+50.0
+62.5
+25.0
+
+51.1
+76.4
+31.5
+
+68.8
+77.3
+34.3
+
+68.8
+85.3
+74.7
+
+MAGRPO
+CoLLM-DC
+CoLLM-CC
+
+74.3
+59.1
+75.2
+
+76.0
+60.5
+75.9
+
+77.5
+60.5
+77.8
+
+85.3
+62.8
+86.5
+
+Metric
+
+MAGRPO
+
+CoLLM-DC
+
+CoLLM-CC
+
+#Epochs
+#Rollouts
+
+8
+16
+
+80
+2
+
+80
+2
+
+#Samples
+#Updates
+Duration
+VRAM
+
+9640
+603
+4.5
+93.8
+
+8592
+2148
+13.4
+126.3
+
+8438
+2110
+11.1
+107.4
+
+Table 3. Training overhead of MAGRPO, CoLLM-DC, and
+CoLLM-CC on CoopHE, under the settings of Appendix C. Metrics include the number of epochs, rollouts per episode, total samples used, policy updates, training duration (H200 hours), and
+VRAM (GB) usage. Results are averaged over 5 runs.
+
+Table 2. Pass@k results (1, 3, 5, 10) on CoopHE. Bolds indicate
+the best performance. Results are averaged over 5 runs.
+
+Since MAGRPO is an instance of K-sampling, the rollout
+in an H-horizon episode forms a K-ary tree and satisfies
+Proposition 4.3. Under the hyperparameter setting in Appendix C, with K = 4 and HP
+= 2, MAGRPO produces
+H
+K H = 16 rollouts and uses k=1 K H = 20 samples,
+assuming no early termination is triggered. In contrast,
+both CoLLM-DC and CoLLM-CC generate a single rollout consisting of H = 2 samples. To ensure a comparable
+number of training samples for MARL, we therefore train
+CoLLM-DC and CoLLM-CC for 10 times as many epochs
+as MAGRPO. Also, MAGRPO operates with a larger effective minibatch size. Accordingly, the agent’s learning rate is
+designed to scale proportionally, resulting in fewer updates.
+
+Table 2 presents the pass@k performance of coding collaboration on CoopHE. Fine-tuning with GRPO and AC yields
+marginal improvements over the raw model. However, this
+improvement over the given model is not due to acquired
+algorithmic knowledge or increased capacity. Instead, the
+training primarily refines the model’s policy, increasing the
+likelihood of producing correct solutions that already lie
+within its representational scope (Yue et al., 2025).
+Most prompt-based multi-agent approaches underperform
+single-model baselines without proper optimization. Agents
+do not have timely communication to reason about each
+other’s correctness or functionalities. Although this challenge can be overcome through sequential execution, it reduces inference speed because agents take turns responding.
+
+Training CoLLM-DC and CoLLM-CC requires substantially longer time and more GPU memory than MAGRPO,
+as critic LLMs must be maintained throughout training.
+However, this overhead does not scale linearly with the
+number of LLMs in the systems (126.3 ≪ 93.8 × 2). This
+is because the critic provides lower-variance gradient estimates, thereby reducing the number of samples that need
+to be retained in GPU memory for back-propagation. Furthermore, CoLLM-CC employs a single centralized critic,
+whose update cost is lower than maintaining n independent
+critics of the same size in CoLLM-DC, thereby reducing
+training time. As CoLLM-CC converges faster (Fig. 2c) and
+a lot of samples trigger early termination during the early
+stages of training, it ultimately uses the fewest samples.
+
+MARL methods can achieve performance comparable to
+or better than that of a single larger model. CoLLM-CC
+consistently achieves the best results across most pass@k
+results, because the main agent is guided to infer the auxiliary agent’s functionality and provide fallback solutions
+when the auxiliary utilities are vulnerable, e.g., the main
+can provide a boundary condition manipulation. Also,
+through MARL optimization, the main completes the remaining components of the implementation, thereby accelerating inference through parallel execution. CoLLM-DC
+15
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+E. Prompt Design Details
+
+- Do NOT include markdown code blocks
+(‘‘‘python)
+- Do NOT include any text before or
+after the function
+- Do NOT include test cases or example
+usage
+- Create a helper function named ’aux’
+that can assist the main function
+- The function should return useful data
+for solving the problem
+
+E.1. Writing Collaboration
+In the TLDR summarization, the instructions for each agent
+are as follows.
+Summary Agent
+Create a concise summary response to
+this post.
+Query: {prompt}
+Instructions: Provide a brief and
+focused summary in a few sentences
+
+Your output should follow this format:
+def aux(...):
+# your code here
+return result
+
+Elaboration Agent
+Create a detailed summary response to
+this post.
+Query: {prompt}
+Instructions: You should use transition
+words to improve flow
+
+Main Agent
+Solve this coding problem by
+implementing the required function.
+Problem: {prompt}
+You have access to a helper function:
+aux(...)
+
+In the arXiv expansion, we use the abstract field of the
+dataset and process it as follows.
+
+Instructions:
+- Output ONLY the function code, no
+explanations or examples
+- Do NOT include markdown code blocks
+(‘‘‘python)
+- Do NOT include any text before or
+after the function
+- Do NOT include test cases or example
+usage
+- Do NOT redefine the aux() function
+- Implement ONLY the ’{entry_point}’
+function as specified
+- You can call aux() to assign a value
+to a variable within your function
+if helpful
+
+Background Agent
+Based on the following scientific
+abstract, expand the content for the
+introduction section.
+Abstract: {abstract}
+Instructions:
+- There is another agent that will
+provide the method and implications
+- You just need to focus on the
+background and motivation
+- Avoid repeating methodology and
+implications content
+Method Agent
+Based on the following scientific
+abstract, expand the content for the
+introduction section.
+Abstract: {abstract}
+Instructions:
+- There is another agent that will
+provide the background and
+motivation
+- You just need to focus on the method
+and implications
+- Avoid repeating background and
+motivation content
+
+Your output should follow this format:
+def {entry_point}({params}):\n # your
+function code here\nreturn result\n
+
+To improve the generated code, agents receive additional
+feedback in addition to the initial problem description. This
+feedback comes from the static analyzer and sandbox tests,
+and is appended to the prompts for subsequent turns.
+Static and execution diagnostics:
+- Main definition: FOUND (Main function
+prime_fib defined)
+- Syntax: OK (Combined code syntax OK)
+- Tests: 4/5 passed
+assert candidate(1) == 2
+AssertionError: expected 2, got 1
+
+E.2. Coding Collaboration
+For CoopHE, we extract the entry point, params from
+the prompt field and instruct the agents as follows.
+
+Revise your prime_fib accordingly.
+
+Auxiliary Agent
+Create a helper function for this coding
+problem.
+Problem: {prompt}
+Instructions:
+- Output ONLY the function code, no
+explanations or examples
+
+E.3. Minecraft
+In StrBuild, each agent is instructed by the following
+prompts at the first turn. The target specifications, available block textures, and building boundaries are pro16
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+vided as target ascii, block agent lines, and
+world bbox from and world bbox to to the agent,
+respectively.
+
+place SOME of the blocks for the
+final build. Output must be
+Minecraft commands only (no markdown
+, no code fences, no extra text).
+
+You are Player i in an n-person
+Minecraft building team. You will
+place SOME of the blocks for the
+final build. Output must be
+Minecraft commands only (no markdown
+, no code fences, no extra text).
+
+Task: Build the 3D structure from the
+provided y-axis slices.
+Available blocks (use ONLY these): {
+block_agent_lines}
+Layers (ascending WORLD y). Each layer
+is a set of rectangles in WORLD (x,z
+) coords:
+- Format: {(x1, y1, z1, x2, y2, z2
+block_id), (x1, y1, z1,
+x2, y2, z2 block_id)}
+
+The target is a character grid made of
+’#’ and ’.’. Its size matches the
+bbox and target rows. Output /
+setblock commands for a subset of
+’#’ positions.
+Target grid (top-down rows): {
+target_ascii}
+
+WORLD bbox (inclusive):
+- from: {world_bbox_from}
+- to:
+{world_bbox_to}
+
+WORLD bbox (inclusive):
+- from: {world_bbox_from}
+- to:
+{world_bbox_to}
+
+Threat check: There are {spider_num}
+spiders nearby; you have {player_hp}
+HP. Spider attack list: {spider_atk
+}, total damage dmg={spider_dmg}. If
+you want to kill them, output the
+attack command: /damage @e[type=
+spider,limit=1] {player_atk}
+minecraft:player attack. All other
+commands should be normal building
+commands.
+
+Coordinate mapping (absolute coords):
+- Let (min_x, min_y, min_z) be bbox.
+from and (max_x, max_y, max_z) be
+bbox.to.
+- x increases from min_x to max_x (
+left to right).
+- y increases from min_y to max_y (
+bottom to top).
+- z is constant (min_z == max_z)
+
+Constraints:
+- Output ONLY Minecraft commands, one
+per line.
+- Allowed commands: /fill and /kill
+- Fill format: /fill x1 y1 z1 x2 y2 z2
+block
+- Use absolute integer coordinates
+only (no ˜).
+- Use ONLY blocks from the legend.
+- Every coordinate must be within the
+bbox.
+
+Available blocks (use ONLY these):
+{block_agent_lines}
+Constraints:
+- Output ONLY Minecraft commands, one
+per line.
+- Allowed commands: /setblock only.
+- Use absolute integer coordinates
+only (no ˜).
+- Place blocks ONLY at ’#’ positions;
+leave ’.’ as air.
+- Adjacent blocks (sharing a side)
+must NOT be the same texture.
+- Every coordinate must be within the
+bbox.
+
+And we provide DC and CC with the following global information, mt , during training.
+You are at turn = {turn} over a {
+num_turns}-turn episode.
+Your last-turn reward is {last_reward} /
+{reward_max}.
+
+Format: /setblock <x> <y> <z> <block>
+
+In HouseBuild, since the player can construct blocks flexibly at any adjacent location, the positions of players are
+assumed to be the center. We employ a simulator to generate
+spider num spiders from arbitrary locations on the map.
+It also computes the player’s health points player hp,
+and the damage inflicted on spiders spider dmg. The
+predefined player attack value is player atk, while each
+spider is assumed to have an attack value spider atk.
+
+F. Reward Design Details
+Reinforcement Learning with Verifiable Rewards (RLVR)
+provides objective and reliable training signals. However,
+most RLVR methods in a multi-turn setting rely on terminal rewards, resulting in extremely sparse feedback that
+complicates credit assignment across multiple agents. Recent work addresses this by introducing process-based or
+intermediate rewards, often instantiated as manually de-
+
+You are Player i in an n-person
+Minecraft building team. You will
+
+17
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+signed rubrics (Uesato et al., 2022; Lifshitz et al., 2025; Wu
+et al., 2025b). However, these approaches typically require
+substantial manual intervention for rubric engineering. It
+remains unclear whether such designs are still generalizable,
+consistent, and aligned with the intended objectives.
+
+library. Any syntax error leads to evaluation termination
+to prevent runtime failures. The test pass rate measures
+the proportion of unit tests that successfully pass within an
+8-second timeout, with rewards scaled by the number of
+tests
+successful assertions (tests) #passed
+#total tests , and termination
+triggered if no tests pass. Cooperation quality assigns a base
+bonus when the main function invokes the auxiliary, with
+additional rewards granted when the main function exhibits
+substantive logic beyond a simple wrapper. A deduction is
+applied if the main function calls the auxiliary but discards
+its return value, penalizing superficial cooperation.
+
+We provide verifiable reward signals at each turn, enabling
+fine-grained and objective supervision throughout the interaction. However, the cumulative return becomes dependent
+on the horizon, resulting in a dynamic return scale that must
+be carefully handled in policy optimization. We solve this
+problem by providing the critic with global information mt ,
+as shown in critic prompts in Appendix E.
+
+F.3. Minecraft
+
+F.1. Writing Collaboration
+
+In StrBuild, we first design the reward to encourage agents
+to construct string-like structures in accordance with the
+blocks
+given paradigms using coverage rate 2#covered
+. The
+#total
+agents are also optimized to minimize unnecessary resource
+blocks
+consumption − 1.5#extra
+. In addition, we introduce
+#total
+an adjacency penalty based on the same-texture adjacency
+texture pairs
+rate, #same
+, which discourages excessive adja2#total pairs
+cency of identical block textures. In HouseBuild, we
+similarly employ the coverage rate and redundancy rate
+to encourage accurate and efficient construction. Also,
+agents
+ damage inflicted by spiders as
+ are penalized for
+spider total dmg
+× 0.2.
+min 1,
+player hp
+
+We evaluate TLDR summarization along three dimensions:
+structural quality, style consistency, and logical coherence.
+Structural wellness measures the relative completion length
+and lexical diversity (unique-word ratio excluding stopwords). Full rewards are assigned when the length ratio lies
+in 1.6-3.2×, and the unique-word ratio is ≥2.0×; values
+within broader tolerances (1.1-5.0× for length and 1.3–2.0×
+for uniqueness) receive proportionally scaled rewards, while
+out-of-range cases incur zero reward and early termination.
+Style consistency is quantified by the Jaccard similarity of
+vocabularies between completions (excluding stopwords),
+capped at 0.03 to balance lexical consistency with vocabulary expansion. Logical coherence is evaluated through
+transition-word usage in the combined text across 12 functional categories, with rewards scaled by category diversity
+as min(0.6 log(#categories + 1), 1).
+
+G. Compute Resources
+The compute resources used in our experiments (Sec. 6) for
+training and evaluation are listed below.
+
+For arXiv expansion, we assess structural wellness, style
+consistency, and logical coherence by comparing the second paragraph against the first. Structural wellness rewards
+optimal length ratios of 1.0-1.3× and unique-word ratios of
+0.7-1.3×, assigns proportional rewards within acceptable
+ranges (0.8-1.5× for length and 0.5-1.7× for uniqueness),
+and terminates evaluation otherwise. Style consistency is
+measured using Jaccard similarity between the two completions, capped at 0.23 and normalized as reward. Logical
+coherence is evaluated through transition-word usage across
+the same 12 categories, with rewards scaled by category
+diversity as min(0.4 log(#categories + 1), 1).
+
+G.1. Training Devices
+• Writing Collaboration
+– Type: GPU Cluster
+CPU: NVIDIA Grace ARMv9
+GPU: 1× NVIDIA Hopper H100
+• Coding Collaboration
+– Type: GPU Cluster
+CPU: Intel Xeon Platinum 8558
+GPU: 1× NVIDIA Hopper H200
+– Type: GPU Cluster
+CPU: Intel Xeon Gold 5318Y
+GPU: 1× NVIDIA Hopper H200
+– Type: GPU Cloud Instance
+CPU: AMD EPYC 9755
+GPU: 1× NVIDIA Hopper H200
+– Type: GPU Cloud Instance
+CPU: Intel Xeon Platinum 8568Y+
+GPU: 1× NVIDIA Hopper H200
+
+F.2. Coding Collaboration
+We evaluate coding collaboration along four dimensions:
+structural integrity, syntactic correctness, test pass rate, and
+cooperation quality. Structural integrity verifies that both
+auxiliary and main functions are properly defined, with
+valid signatures and return statements; failure to define the
+main function results in immediate termination. Syntactic
+correctness assesses whether the concatenated code parses
+without errors, verified via the Abstract Syntax Tree (AST)
+
+• Minecraft Building Collaboration
+18
+
+Learning Decentralized LLM Collaboration with Multi-Agent Actor Critic
+
+I. Limitations and Future Work
+
+– Type: GPU Cluster
+CPU: Intel Xeon Platinum 8592+
+GPU: 1× NVIDIA Blackwell B200
+– Type: GPU Cluster
+CPU: Intel Xeon Platinum 8558
+GPU: 1× NVIDIA Hopper H200
+– Type: GPU Cloud Instance
+CPU: Intel Xeon Platinum 8568Y+
+GPU: 1× NVIDIA Blackwell B200
+– Type: GPU Cloud Instance
+CPU: AMD EPYC 9655
+GPU: 1× NVIDIA Hopper H200
+– Type: GPU Cloud Instance
+CPU: AMD EPYC 9755
+GPU: 1× NVIDIA Hopper H200
+– Type: GPU Cloud Instance
+CPU: Intel Xeon Platinum 8592+
+GPU: 1× NVIDIA Hopper H200
+
+Our work has several limitations. Although our MAAC
+methods (i.e., CoLLM-DC and CoLLM-CC) can, in principle, be applied to online learning, due to MAGRPO’s
+low sample efficiency (Proposition 4.3), we are unable to
+extend our experiments to longer-horizon tasks for comparison. Also, due to constraints on computing resources, our
+experiments are limited to proof-of-concept settings. How
+LLM-based collaboration can scale to larger multi-agent systems with more diverse and heterogeneous agents remains
+an open question. In addition, as discussed in Appendix B,
+there exists a more efficient variant of CoLLM-DC. Although it has certain drawbacks, it remains worth exploring
+whether these limitations can be mitigated or whether this
+trick can be applied to CC methods. Finally, our methods
+assume a strictly decentralized setting with concurrent execution and no communication. How to design methods with
+relaxed constraints is still an open question.
+
+G.2. Inference Device
+• All Tasks
+– Type: Standalone Workstation
+CPU: AMD Ryzen 9 9950X
+GPU: 1× NVIDIA GeForce RTX 5090
+
+H. Code and Dataset
+Our code and datasets are available in the following repositories (Version 1.3.2):
+• CoMLRL: Cooperative Multi-LLM Reinforcement
+Learning (CoMLRL) is an open-source library
+for training multiple LLMs to collaborate using
+Multi-Agent Reinforcement Learning (MARL).
+It provides implementations of various MARL
+trainers for decentralized LLM collaboration.
+https://github.com/OpenMLRL/CoMLRL/
+releases/tag/v1.3.2.
+This repository con• LLM Collab Writing:
+tains the writing collaboration experiments.
+https://github.com/OpenMLRL/LLM_
+Collab_Writing/releases/tag/v1.3.2.
+• LLM Collab Code Generation: This repository
+contains the coding collaboration experiments.
+https://github.com/OpenMLRL/LLM_
+Collab_Code_Generation/releases/tag/
+v1.3.2.
+• LLM Collab Minecraft: This repository contains the collaborative game-playing experiments in
+Minecraft. https://github.com/OpenMLRL/
+LLM_Collab_Minecraft/releases/tag/
+v1.3.2.
+19
+
+

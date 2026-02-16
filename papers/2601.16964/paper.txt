@@ -1,0 +1,2535 @@
+1
+
+AgentDrive: An Open Benchmark Dataset for
+Agentic AI Reasoning with LLM-Generated
+Scenarios in Autonomous Systems
+
+arXiv:2601.16964v1 [cs.AI] 23 Jan 2026
+
+Mohamed Amine Ferrag∗§ , Senior Member, IEEE, Abderrahmane Lakas∗ , Senior Member, IEEE,
+and Merouane Debbah1 , Fellow, IEEE
+
+Abstract—The rapid advancement of Large Language Models
+(LLMs) has sparked growing interest in their integration within autonomous systems to enable reasoning-driven perception, planning,
+and decision-making. However, evaluating and training such agentic AI models remains challenging due to the lack of large-scale,
+structured, and safety-critical benchmarks. This paper introduces
+AgentDrive, an open benchmark dataset containing 300,000 LLMgenerated driving scenarios designed for the training, fine-tuning,
+and evaluation of autonomous agents under diverse conditions.
+AgentDrive formalizes a factorized scenario space across seven
+orthogonal axes—scenario type, driver behavior, environment,
+road layout, objective, difficulty, and traffic density—and employs
+an LLM-driven prompt-to-JSON pipeline to produce semantically
+rich, simulation-ready specifications that are validated against
+physical and schema constraints. Each scenario undergoes simulation rollouts, surrogate safety metric computation, and rule-based
+outcome labeling. To complement simulation-based evaluation,
+we introduce AgentDrive-MCQ, a 100,000-question reasoning
+benchmark spanning five reasoning dimensions—physics, policy,
+hybrid, scenario, and comparative—to systematically assess
+the cognitive and ethical reasoning of LLM-based agents. We
+conducted a large-scale evaluation of fifty leading LLMs on
+the AgentDrive-MCQ benchmark to measure their reasoning
+capabilities across these five dimensions, covering models such
+as GPT-5, ChatGPT 4o, Gemini 2.5 Flash, DeepSeek V3, Qwen3
+235B, ERNIE 4.5 300B, Grok 4, Mistral Medium 3.1, and Phi
+4 Reasoning Plus. Results reveal that while proprietary frontier
+models dominate in contextual and policy reasoning, advanced
+open models are rapidly closing the gap in structured and physicsgrounded reasoning. To support open science and reproducibility,
+we release the AgentDrive dataset (including labeled data), the
+AgentDrive-MCQ benchmark, evaluation scripts, and all related
+materials on GitHub: https://github.com/maferrag/AgentDrive.
+Index Terms—Autonomous Driving, Large Language Models,
+Autonomous AI Agents, Benchmark Datasets, Reasoning.
+
+I. I NTRODUCTION
+The rise of large language models (LLMs) has sparked
+broad interest in applying them to autonomous driving (AD)
+due to their strong reasoning and conversational abilities
+[1]. Researchers have introduced the concept of LLM4AD,
+designing AD systems that leverage LLMs for tasks ranging
+from perception and scene understanding to decision-making
+[2], [3], [4]. For example, Cui et al. [2] proposed an LLM4AD
+framework with a comprehensive simulation benchmark to
+∗ Department of Computer and Network Engineering, College of Information
+Technology, United Arab Emirates University, Al Ain, United Arab Emirates.
+1 Khalifa University of Science and Technology, Abu Dhabi, United Arab
+Emirates.
+§ Corresponding author: mohamed.ferrag@uaeu.ac.ae
+
+evaluate how well LLMs follow driving instructions. Initial
+experiments in both simulation and real-world driving showed
+that LLMs can indeed enhance an autonomous vehicle’s understanding of complex environments and improve human–vehicle
+interactions. These findings, echoed by recent surveys [1], [3],
+suggest that combining LLMs with vision models could enable
+more open-world perception, logical reasoning, and adaptive
+learning than traditional rule-based or end-to-end systems.
+At the same time, the LLM4AD concept paper and surveys
+emphasize that this nascent field faces significant challenges,
+such as ensuring real-time performance and safety, which must
+be addressed as development continues.
+Integrating LLMs into an autonomous driving agent raises
+new complexities in how the vehicle interprets instructions,
+interacts with humans, and adheres to traffic rules. One
+approach to this is DriVLMe, an LLM-based driving agent
+augmented with both embodied experiences (learned via a
+driving simulator) and social experiences from real human
+dialogues [5]. The goal of DriVLMe is to facilitate natural
+communication between humans and self-driving cars and
+to handle long-horizon navigation tasks through free-form
+dialogue. DriVLMe demonstrated competitive performance in
+open-loop simulations and closed-loop user studies; however,
+it also revealed several limitations, including unacceptably
+high inference times, imbalanced training data, and difficulty
+handling sudden environmental changes. To ensure LLM-driven
+vehicles make decisions that are not only effective but also
+legally and ethically aligned, other works focus on injecting
+domain knowledge and safeguards into the decision process.
+For example, Cai et al. [6] present a retrieval-augmented
+reasoning framework where a Traffic Regulation Retrieval
+module automatically fetches relevant traffic laws and safety
+guidelines based on the vehicle’s situation, and an LLM then
+interprets these rules to assess each action’s legality and safety.
+This approach yields an interpretable decision-making pipeline
+that adapts to regional regulations and provides transparency
+into why the AI chooses a certain action. Similarly, Kong
+et al. [7] introduce a multi-agent superalignment framework
+to enforce data security and policy compliance in LLMdriven cars. Their system safeguards sensitive vehicle data
+(e.g., precise locations, camera feeds) from potential leaks
+and filters the LLM’s queries and outputs, ensuring that
+driving commands do not violate safety rules or human values.
+These efforts demonstrate how researchers are enhancing LLMbased driving agents with embodied learning and alignment
+
+2
+
+mechanisms, enabling autonomous vehicles to interact naturally
+while adhering to legal, safety, and trust constraints.
+
+AgentDrive-Gen AgentDrive-MCQ
+Beyond high-level dialogue and compliance, LLMs and
+multimodal models are being used to tackle core perception
+and planning challenges in autonomous driving. Bai et al. [8]
+argue that prior vision–language planning approaches, which
+tokenize only 2D images, cannot reliably perceive a 3D world.
+They propose a planner that uses DETR-style 3D perceptrons as
+tokenizers, feeding the LLM with 3D object queries from multiview camera images. This strategy provided rich geometric
+context, yielding superior performance in 3D object detection
+and end-to-end planning on the nuScenes dataset, suggesting
+that 3D-tokenized LLMs could be key to more reliable path
+planning. Sah et al. [9] integrate deep learning models for
+traffic sign recognition and lane detection with a lightweight
+multimodal LLM that can reason about the scene. This hybrid
+system achieved near-perfect accuracy in clear conditions and
+maintained robustness under adverse weather and occlusions,
+demonstrating the LLM’s ability to interpret contextual clues.
+Other studies leverage LLMs for specialized tasks such as
+parking in mixed traffic [10] and interpretable end-to-end
+control. Chen et al. [11] fuse object-level vector modalities
+with LLM reasoning to provide explainable driving decisions,
+while Xu et al. [12] propose DriveGPT4, which generates both
+low-level control signals and natural language explanations
+for each action. These advances highlight LLMs as powerful
+engines for enhancing perception, planning, and transparency
+in AD systems.
+
+A large-scale dataset of 300 K
+LLM-generated driving
+scenarios encoded in structured
+JSON, covering seven orthogonal
+axes — scenario type, driver
+behavior, environment, road
+layout, objective, difficulty, and
+traffic density — ensuring
+semantic richness and simulation
+readiness.
+
+Evaluates LLM-based autonomous
+agents on cognitive and ethical
+reasoning across five dimensions —
+physics, policy, hybrid, scenario,
+and comparative. Uses the
+AgentDrive-MCQ benchmark with
+100 K structured questions.
+
+AgentDrive-Sim
+A simulation and labeling dataset with 300 K scenario
+executions, each producing surrogate safety metrics
+(e.g., time-to-collision, headway distance) and
+interpretable outcome labels (safe_goal, safe_stop,
+inefficient, unsafe). Enables supervised learning and
+benchmarking.
+
+Fig. 1: Overview of the AgentDrive benchmark suite, which
+comprises three complementary datasets: AgentDrive-Gen for
+LLM-based driving scenario generation, AgentDrive-Sim for
+simulation and outcome labeling, and AgentDrive-MCQ for
+reasoning and decision-making evaluation.
+
+To validate and further develop LLM-driven autonomous
+vehicles, the community is creating new benchmarks and
+Research Questions
+evaluation tools to enhance their development. One notable
+effort is Bench2ADVLM, a closed-loop evaluation framework
+RQ1: How can Large Language Models (LLMs) be systemintroduced by Zhang et al. [13] to test vision–language AD
+atically leveraged to generate diverse, semantically rich, and
+models in interactive settings. Bench2ADVLM enables realsafety-critical autonomous driving scenarios that enable largescale training, fine-tuning, and evaluation of agentic AI systems?
+time closed-loop testing across simulators and physical vehicles,
+with a scenario generator that uncovers failure modes. Results
+RQ2: How can structured simulation data and reasoning-based
+benchmarks be unified to comprehensively assess the cognitive,
+indicate that current systems still exhibit limitations under inethical, and physics-grounded reasoning capabilities of LLMs in
+teractive conditions. In parallel, MAPLM [14] provides a largeautonomous systems?
+scale multimodal dataset combining maps, LiDAR, panoramic
+RQ3: To what extent can state-of-the-art LLMs—both proprietary
+images, and Q&A annotations, highlighting the importance of
+and open-source (e.g., GPT-5, ChatGPT 4o, DeepSeek V3,
+domain-specific data for grounding LLMs in driving contexts.
+Qwen3 235B, ERNIE 4.5 300B, Grok 4)—demonstrate consistent
+Gao et al. [4] survey how foundation models can generate
+and reliable reasoning performance across multiple drivingand analyze diverse scenarios, showing their potential for
+related reasoning dimensions?
+evaluating and handling safety-critical cases. Despite progress,
+challenges persist in latency, interpretability, privacy, regulatory
+In response to these research questions, we introduce
+compliance, and robustness. Addressing these motivates the AgentDrive, an open benchmark dataset constructed from
+creation of AgentDrive, an open benchmark that exposes LLM-generated scenarios for evaluating and training agentic
+LLM-based agents to diverse, safety-critical, and long-horizon AI models in autonomous systems, as presented in Fig. 1.
+scenarios through systematic closed-loop evaluation.
+AgentDrive is built around an end-to-end generation and
+evaluation pipeline that samples from a factorized scenario
+space, encodes each instance into a structured specification via
+Building on the challenges of scalable and realistic scenario an LLM-driven prompt, validates and executes it in simulation,
+generation, our work poses two key research questions for computes surrogate safety metrics, and assigns interpretable
+agentic AI evaluation:
+outcome labels. Furthermore, we extend this framework with
+
+3
+
+AgentDrive-MCQ, a reasoning-oriented benchmark designed
+to evaluate the cognitive and decision-making capabilities of
+LLMs. The key contributions of this work are summarized as
+follows:
+
+evaluation. Section V presents the reasoning performance of
+fifty leading large language models on AgentDrive-MCQ
+across multiple reasoning dimensions. Finally, Section VI
+concludes the paper and outlines future research directions.
+
+1) Factorized Scenario Space: We formalize the auII. R ELATED W ORK
+tonomous driving scenario space across seven orthogonal
+axes—scenario type, driver behavior, environment, road
+Recent research has explored a wide range of approaches
+layout, objective, difficulty, and traffic density—to ensure
+to integrating large language models into autonomous drivcomprehensive coverage of both routine and rare safetying systems. These works span from instruction-following
+critical situations.
+frameworks and cooperative driving systems to benchmarks
+2) AgentDrive-Gen: We developed AgentDrive-Gen,
+for scenario understanding, theory testing, and automated
+a large-scale benchmark comprising 300,000 LLMscenario generation. For clarity, we group the discussion
+generated driving scenarios. It is built upon a promptthematically into five main categories: (i) LLM-augmented
+engineering and schema-validation framework that transautonomous driving agents, (ii) LLM-based scenario and code
+forms abstract scenario tuples into valid JSON specifigeneration, (iii) benchmarks for driving scenario reasoning,
+cations. The pipeline leverages large language models
+(iv) driving theory tests for LLMs, and (v) our positioning of
+to generate semantically rich, physically consistent, and
+AgentDrive in this landscape. A comparative overview of
+simulation-ready representations suitable for both training
+these works, including their focus, key features, and limitations,
+and evaluation.
+is provided in Table I.
+3) AgentDrive-Sim: Each generated scenario from
+AgentDrive-Gen is executed within a simulator to
+produce dynamic rollouts. Surrogate safety metrics (e.g., A. LLM-Augmented Autonomous Driving Agents
+minimum time-to-collision and headway distance) are
+Ma et al. [15] introduced LaMPilot, a framework that
+computed, and a rule-based labeling system assigns
+integrates LLMs into autonomous driving systems to interpret
+interpretable outcome categories (safe goal, safe stop,
+high-level instructions and translate them into low-level driving
+inefficient, unsafe). The resulting dataset, denoted
+code using predefined primitives. Alongside the framework,
+AgentDrive-Sim, serves as a large-scale benchmark
+they released LaMPilot-Bench, a benchmark to evaluate how
+for supervised learning and performance evaluation in
+well LLM-based agents follow such instructions across various
+safety-critical driving scenarios.
+scenarios. Their results showed that large models can generalize
+4) AgentDrive-MCQ: We introduced AgentDrive-MCQ,
+across multiple driving tasks, highlighting the potential of
+a reasoning-focused extension of AgentDrive comprisLLMs for AD instruction-following. In the multi-vehicle
+ing 100,000 multiple-choice questions. Each question
+context, Chiu et al. [17] proposed V2V-LLM, which leverages
+is systematically derived from structured scenarios and
+multimodal LLMs for vehicle-to-vehicle cooperative driving.
+categorized into five reasoning styles—physics, policy, hyBy merging perception data from multiple connected cars,
+brid, scenario, and comparative. This benchmark enables
+V2V-LLM enables reasoning about occluded hazards and
+large-scale, fine-grained evaluation of LLM reasoning
+planning joint maneuvers. Their evaluations demonstrated that
+and decision-making capabilities across diverse driving
+the approach outperforms traditional early-fusion baselines
+conditions, complementing simulation-based performance
+in grounding objects and supporting collaborative driving
+with structured reasoning assessment.
+strategies.
+5) Large-Scale LLM Evaluation: We conduct a comprehensive evaluation of fifty leading LLMs—including
+GPT-5, ChatGPT 4o, Gemini 2.5 Flash, DeepSeek V3, B. LLM-Based Scenario and Code Generation
+Qwen3 235B, ERNIE 4.5 300B, Grok 4, and Mistral
+Beyond direct control, LLMs have also been used to
+Medium 3.1—on the AgentDrive-MCQ benchmark to
+generate simulation content. Lebioda et al. [18] studied whether
+measure their reasoning capabilities across five dimensions:
+requirements in natural language can be transformed into
+comparative, physics, policy, hybrid, and scenario. Results
+configuration code for driving simulators. Using a case study
+demonstrate that while proprietary frontier models lead in
+in CARLA, they demonstrated that while LLMs can generate
+contextual and policy reasoning, advanced open models are
+functional code, human intervention is still required to address
+rapidly closing the gap in structured and physics-grounded
+errors and omissions, underscoring the limitations of current
+reasoning.
+models in automated scenario coding. In contrast, Yao et al.
+The remainder of this paper is organized as follows. Sec- [19] introduced AGENTS-LLM, a framework for augmenting
+tion II reviews related work on LLM-based autonomous driving real-world traffic scenarios with LLM-driven modifications.
+benchmarks and reasoning evaluation. Section III details the Their agentic approach allows incremental scenario editing (e.g.,
+AgentDrive dataset generation methodology, including sce- introducing a red-light violation) while maintaining physical
+nario design, prompt engineering, simulation, and labeling pro- plausibility. Human evaluations confirmed that AGENTS-LLM
+cesses. Section IV introduces the AgentDrive-MCQ bench- generates realistic yet rare edge cases, providing scalable stressmark, which extends AgentDrive into structured reasoning testing for autonomous planners.
+
+4
+
+TABLE I: Comparison of related works on LLM- and VLM-based autonomous driving benchmarks and evaluation.
+Work
+
+Year
+
+Focus / Contribution
+
+Key Features
+
+Limitations
+
+LaMPilot [15]
+
+2024
+
+Instruction-following AD with LLMgenerated driving code
+
+Benchmark and framework translating text to
+executable primitives
+
+Limited to a pre-defined action space and code translation;
+does not generate structured simulation scenarios or
+reasoning benchmarks
+
+Tang
+[16]
+
+al.
+
+2024
+
+Driving theory evaluation of LLMs
+
+500+ MCQs; comparison of GPT-3.5, GPT-4,
+etc.
+
+Tests static theoretical knowledge only; lacks simulationgrounded tasks, generative scenario diversity, and reasoning integration
+
+V2V-LLM [17]
+
+2025
+
+Cooperative vehicle-to-vehicle reasoning with multimodal LLMs
+
+Shared perception fusion; V2V-QA dataset
+
+Focused on connected vehicles and perception fusion;
+does not provide large-scale generative benchmarks or
+unified reasoning evaluation
+
+Lebioda et al.
+[18]
+
+2025
+
+LLMs for automotive requirement-tocode translation
+
+Case study: natural language → CARLA
+configuration
+
+Semi-automated with frequent human correction; not
+designed for large-scale generative or reasoning-driven
+evaluation
+
+AGENTSLLM [19]
+
+2025
+
+Agentic LLM for scenario augmentation
+
+Incremental modification of real traffic logs;
+realistic rare cases
+
+Relies on existing driving data; lacks fully generative,
+simulation-based, or reasoning-oriented evaluation
+
+al.
+
+2025
+
+Benchmarking LLMs on motorway
+driving scenarios
+
+Text-based scenario understanding; comparison of six LLMs
+
+Restricted to motorway conditions and textual QA; does
+not incorporate generative simulation or diverse reasoning
+styles
+
+STSBench [21]
+
+2025
+
+Spatio-temporal reasoning benchmark
+
+Multi-camera nuScenes QA; 43 scenario types,
+971 MCQs
+
+Focused on visual QA; not simulation-grounded and lacks
+LLM-generated structured scenarios or agentic reasoning
+coverage
+
+AD2 -Bench
+[22]
+
+2025
+
+Hierarchical CoT benchmark in adverse conditions
+
+5.4k annotated reasoning chains; step-by-step
+evaluation
+
+Limited to perception and reasoning under predefined
+conditions; no generative scenario modeling or simulationbased evaluation
+
+Pei et al. [23]
+
+2025
+
+Theory + hazard perception benchmark
+
+700 MCQs, 54 hazard videos; real exam
+format
+
+Focused on driver testing and hazard perception; lacks
+generative scenarios, simulation rollouts, and reasoning
+diversity
+
+DriveBench
+[24]
+
+2025
+
+Evaluation of Vision-Language Models
+(VLMs) for reliability and grounding
+
+DriveBench (VLM): 19,200 frames, 20,498
+QA pairs across perception, prediction, planning, and behavior; 12 VLMs tested under
+17 conditions (clean, corrupted, text-only);
+refined robustness metrics
+
+Focuses on VLM robustness and reliability; not a generative benchmark—uses fixed datasets; emphasizes perception/prediction rather than textual scenario generation
+or reasoning diversity
+
+AgentDrive
+(ours)
+
+2025
+
+Unified benchmark suite for generative
+simulation and reasoning-driven evaluation of agentic AI models
+
+AgentDrive:
+300K
+LLM-generated,
+simulation-ready driving scenarios across
+seven orthogonal axes (scenario type, driver
+behavior, environment, road layout, objective,
+difficulty, traffic density); structured JSON
+schema, surrogate safety metrics, and rulebased outcome labeling. AgentDrive-MCQ:
+100K reasoning questions covering five
+dimensions (physics, policy, hybrid, scenario,
+comparative); large-scale evaluation of 50
+LLMs with open-source scripts for training
+and assessment.
+
+Currently limited to text-based reasoning where visual
+contexts are represented as textual descriptions; multimodal (visual–language) LLMs to be integrated in future
+work. Unlike prior works, it introduces the first fully
+generative, simulation-grounded, and reasoning-oriented
+benchmark for evaluating autonomous agent cognition.
+
+Zhou
+[20]
+
+et
+
+et
+
+C. Benchmarks for Driving Scenario Reasoning
+
+D. Driving Theory Tests for LLMs
+
+Several works have drawn inspiration from human licensing
+tests to evaluate LLMs’ knowledge of driving rules. Tang et al.
+Zhou et al. benchmarked six LLMs on motorway driving tested multiple LLMs on driving theory questions, reporting
+scenario understanding, focusing on their ability to interpret that only GPT-4 consistently exceeded the passing threshold,
+textual descriptions of traffic situations [20]. Their results offer while other models lacked sufficient domain knowledge [16].
+insights into the relative strengths of LLMs for functional Pei et al. expanded this approach by creating a benchmark of
+driving scenario reasoning. Fruhwirth-Reisinger et al. devel- over 700 multiple-choice questions and 54 hazard perception
+oped STSBench, a spatio-temporal benchmark derived from videos [23]. Their findings showed that while GPT-4 performed
+nuScenes that evaluates multimodal LLMs on reasoning across strongly on theoretical questions, no model successfully passed
+time and multiple views [21]. Covering 43 scenario types the hazard perception component, revealing current limitations
+with nearly 1,000 human-verified multiple-choice questions, in dynamic traffic understanding.
+STSBench revealed that state-of-the-art vision-language models
+still struggle with spatio-temporal reasoning in traffic. Similarly,
+Wei et al. presented AD2 -Bench, a benchmark targeting adverse E. AgentDrive in Context
+driving conditions such as dense traffic, fog, and nighttime
+Recent research has demonstrated significant progress in apenvironments [22]. With more than 5,000 annotated reasoning plying large language models to autonomous driving, spanning
+chains, AD2 -Bench highlights the difficulty multimodal current instruction following, cooperative reasoning, requirement transLLMs face in step-by-step reasoning under safety-critical lation, and domain-specific benchmarking. However, existing
+conditions.
+studies typically address isolated components of the autonomy
+
+5
+
+Fig. 2: AgentDrive Framework: End-to-End Pipeline for LLM-Generated Autonomous Driving Scenarios.
+
+pipeline—such as perception, code synthesis, or theoretical rea- and highlights the reproducibility of our framework. The
+soning—without providing a unified and generative framework primary goal is to transform abstract scenario descriptions into
+that integrates scenario creation, simulation, and reasoning structured, simulation-ready inputs that yield diverse, safetyevaluation.
+critical driving trajectories. Table II presents the key symbols,
+AgentDrive advances this landscape by introducing a their corresponding methodological blocks, and the concise
+fully generative, simulation-grounded, and reasoning-oriented definitions used throughout the dataset generation pipeline.
+Figure 2 illustrates the complete workflow of AgentDrive,
+benchmark that bridges these dimensions. It defines a formal
+compositional scenario space and employs LLM-driven prompt which transforms abstract scenario specifications into curated,
+engineering to generate 300K structured driving scenarios simulation-ready datasets. The process begins with a factorized
+validated through a JSON schema. Each scenario is grounded in scenario space that encodes driver behaviors, road layouts,
+high-fidelity simulation rollouts, where surrogate safety metrics environmental conditions, objectives, difficulty levels, and
+are computed, and rule-based labeling provides interpretable traffic density. Structured prompts are then built and passed to a
+outcome categories. In addition, entropy-maximized sampling diverse pool of large language models (LLMs), which generate
+ensures balanced coverage across scenario dimensions, includ- candidate scenario JSONs. These outputs undergo schema
+validation, error checks, duplicate removal, and cross-model
+ing rare safety-critical conditions.
+Beyond simulation, AgentDrive-MCQ extends the bench- consistency verification before being added to the cleaned
+mark into the reasoning domain with 100K multiple-choice dataset. Validated scenarios are executed in simulation, during
+questions that assess LLM understanding across physics, policy, which logs and surrogate safety metrics are collected. This is
+hybrid, scenario, and comparative reasoning styles. This unified followed by rule-based labeling to assign interpretable outcome
+framework—combining generative scenario synthesis with categories such as safe stop, safe goal, unsafe, or inefficient.
+structured reasoning evaluation—positions AgentDrive as The final curated dataset provides a diverse, safety-critical
+the first principled benchmark for assessing the robustness, benchmark that supports the training and evaluation of agentic
+safety, and generalization capabilities of agentic AI systems in AI systems for autonomous driving.
+autonomous driving.
+A. Scenario Space Definition
+III. A G E N T D R I V E : DATASET G ENERATION M ETHODOLOGY
+The foundation of reliable autonomous driving evaluation
+This section presents our proposed pipeline for generating, lies in constructing a representative and diverse scenario space.
+simulating, and labeling autonomous driving scenarios. The To formalize this, we define a scenario as a tuple:
+methodology is structured into six key components: (i) definis = (t, b, e, r, o, d, q),
+(1)
+tion of the scenario space, (ii) LLM-driven specification, (iii)
+simulation rollout generation, (iv) computation of surrogate where t ∈ T represents the scenario type (e.g., lane change,
+safety metrics, (v) rule-based labeling, and (vi) construction intersection crossing, merging), b ∈ B denotes the driver
+of the data set. Each component is described in detail with a behavior (e.g., compliant, distracted, or aggressive), e ∈ E
+mathematical formalization that clarifies the problem setting captures environmental conditions (e.g., rain, fog, or low
+
+6
+
+visibility), r ∈ R defines the road layout (e.g., straight
+highway, urban intersection, or roundabout), o ∈ O specifies
+the ego-vehicle objective (e.g., safe navigation, overtaking, or
+emergency stop), d ∈ D quantifies the difficulty level (e.g.,
+easy, moderate, or complex), and q ∈ Q encodes traffic density
+(e.g., sparse, medium, or congested).
+The overall scenario space is expressed as the Cartesian
+product of these seven axes:
+S = T × B × E × R × O × D × Q.
+
+(2)
+
+This formalization provides a structured and extensible
+framework for representing the heterogeneity of real-world
+driving contexts. By sampling along each axis, we ensure
+broad coverage of both nominal and non-nominal conditions.
+Crucially, this includes rare but critical safety scenarios, such
+as malfunctioning traffic signals, sensor-blinding weather, or
+adversarial driver behaviors. These edge cases, though infrequent in naturalistic datasets, are disproportionately influential
+in assessing system robustness and generalization.
+Moreover, the factorized design of S enables systematic
+stress-testing across dimensions. For example, combining
+aggressive driver behavior (b) with high traffic density (q) under
+adverse weather (e) can generate compound scenarios that
+expose the limitations of perception, prediction, and planning
+modules. Hence, the scenario space not only supports comprehensive coverage but also facilitates controlled experimentation
+to benchmark agentic AI systems driven by LLM-generated
+scenarios.
+
+TABLE II: Notation used throughout the dataset generation
+methodology.
+Symbol
+
+Block
+
+Definition
+
+s
+
+Scenario Space
+
+t∈T
+
+Scenario Space
+
+b∈B
+
+Scenario Space
+
+e∈E
+
+Scenario Space
+
+r∈R
+o∈O
+d∈D
+q∈Q
+S
+
+Scenario Space
+Scenario Space
+Scenario Space
+Scenario Space
+Scenario Space
+
+H(d)
+
+Scenario Space
+
+Scenario
+tuple
+s
+=
+(t, b, e, r, o, d, q)
+Scenario type (e.g., lane change, intersection)
+Driver behavior (e.g., compliant, aggressive)
+Environmental conditions (e.g., rain,
+fog)
+Road layout/topology
+Ego objective (e.g., overtake, safe stop)
+Difficulty level {easy, medium, hard}
+Traffic density {low, medium, high}
+Cartesian product T × B × E × R ×
+O×D×Q
+Difficulty-specific numeric constraints
+(e.g., min ttc, max accel)
+
+P (s, H(d))
+
+LLM Spec
+
+f (s)
+
+LLM Spec
+
+Gϕ
+ȷ̂
+C
+Π
+
+LLM Spec
+LLM Spec
+LLM Spec
+LLM Spec
+
+R
+ȷ̂∗
+
+LLM Spec
+LLM Spec
+
+M
+−1
+τ = {xt }T
+t=0
+T
+
+Simulation
+Simulation
+Simulation
+
+xt ∈ R d
+
+Simulation
+
+∆t
+
+Simulation
+
+Structured prompt combining f (s)
+with H(d)
+Natural-language encoding of the scenario tuple s
+LLM generator with parameters ϕ
+Raw JSON scenario generated by Gϕ
+JSON schema / structural constraints
+Post-processing/repair module enforcing C
+Maximum repair/retry attempts for Π
+Repaired/validated JSON after Π
+Simulator configured by ȷ̂∗
+Rollout (state trajectory) of horizon T
+Number of discrete time steps
+(duration_steps)
+State vector at time t (ego, traffic,
+signals, environment)
+Time
+step,
+∆t
+=
+1/policy_frequency
+
+B. Scenario Taxonomy and Diversity
+TTC(t)
+Metrics
+Instantaneous time-to-collision at time
+t
+The richness of the scenario space S (Eq. 2) emerges from
+TTCmin
+Metrics
+Episode-level
+minimum
+TTC,
+mint TTC(t)
+its decomposition into multiple orthogonal axes, each capturing
+xE (t), xV (t)
+Metrics
+Longitudinal positions of ego E and
+a distinct facet of the driving task. This factorized view not only
+lead vehicle V
+supports structured exploration of safety-critical situations but
+vE (t), vV (t)
+Metrics
+Velocities of ego E and lead vehicle
+V
+also enables controlled variation along individual dimensions.
+θunsafe
+Metrics
+Unsafe TTC threshold (e.g., 0.5 s)
+Below, we outline the key axes and their corresponding
+θnear
+Metrics
+Near-miss TTC threshold (e.g., 1.0 s)
+taxonomies.
+collision
+Labeling
+Detected crash event (boolean)
+1) Scenario Types.: We define a comprehensive set of
+red_violation
+Labeling
+Crossed stopline on red (boolean)
+stopped_on_red
+Labeling
+Full stop before stopline on red
+driving situations that span both routine and edge-case con(boolean)
+ditions. Representative examples include red-light dilemma
+crossed_green
+Labeling
+Crossed stopline on green (boolean)
+Y
+Labeling
+Outcome
+label
+∈
+zones, yield/priority confusion, highway merging at high
+{unsafe, safe_goal, safe_stop,
+speed, icy bridge segments, and pedestrian jaywalking. The
+inefficient}
+ℓ
+Labeling
+Assigned categorical label for a rollout
+taxonomy explicitly incorporates vulnerable road users (VRUs),
+D
+Dataset
+Final dataset {(si , ȷ̂i , τi , ℓi )}N
+environmental hazards, and mechanical failures (e.g., brake
+i=1
+N
+Dataset
+Number of generated scenarios/entries
+loss, tire blowouts). By explicitly encoding corner cases, the
+H(·)
+Dataset
+Entropy used to encourage axis-wise
+taxonomy ensures systematic stress-testing of autonomous
+coverage
+{axisi }
+Dataset
+Sequence of sampled values along a
+agents in situations rarely observed in naturalistic driving logs
+given axis (i = 1..N )
+but disproportionately critical for safety validation.
+policy_frequency
+Params
+Control frequency (Hz) determining
+∆t
+2) Driver Behaviors.: To capture the heterogeneity of human
+duration_steps
+Params
+Discrete horizon length for each scedriving styles, we define behavioral profiles ranging from
+nario
+calm, cooperative, or rule-following to aggressive, impatient,
+distracted, or impaired. We also account for role-specific
+driving modes, such as taxi-style stop-and-go, delivery routing
+under time pressure, and convoy following. This axis ensures
+3) Environmental Conditions.: Real-world conditions vary
+that autonomous systems are evaluated not only against widely across geography, climate, and time of day. Our
+compliant traffic participants but also against unpredictable, taxonomy spans clear daytime driving, low-visibility situations
+adversarial, and non-standard agents, reflecting the variability such as foggy night driving, and extreme weather events
+of real-world traffic ecosystems.
+including hailstorms, sandstorms, and blinding low-sun glare.
+
+7
+
+We also incorporate urban-specific challenges such as neon
+Formally, for each sampled scenario s, we construct a
+light glare at night, which degrade visual perception systems. prompt:
+These variations directly reflect the operational design domains
+P (s, H(d)) = f (s) ∪ H(d),
+(6)
+(ODDs) outlined by regulatory bodies and expose the fragility
+where f (s) encodes the axis tuple into a natural language
+of perception and control pipelines under degraded sensing
+description, and H(d) provides difficulty-specific numerical
+conditions.
+hints (e.g., minimum time-to-collision thresholds, maximum
+4) Road Layouts.: Road geometry constitutes another axis
+acceleration bounds). The prompt thus combines contextual
+of complexity. We include highways, interchanges, roundabouts,
+semantics with quantitative constraints, guiding the generative
+rural roads, mountain passes, tunnels, and bridges with varying
+process.
+constraints such as narrow lanes, limited visibility, or sharp
+A large language model (LLM) Gϕ then produces a structured
+curves. By systematically varying these topologies, the frameJSON representation:
+work probes the limits of map-based localization, lane-level
+
+reasoning, and motion planning under non-trivial geometric
+ȷ̂ = Gϕ P (s, H(d)) ,
+(7)
+constraints.
+which must conform to a schema C. Generations that violate
+5) Objectives.: The ego vehicle’s intended task defines
+C are flagged as invalid and corrected by a post-processing
+the contextual goal for each scenario. Objectives range from
+module Π, which retries up to R attempts:
+regulatory compliance (e.g., obey red light, respect pedestrian
+crossings, use turn signals) to maneuvering (e.g., merge
+ȷ̂∗ = Π(ȷ̂, C, R).
+(8)
+smoothly, overtake safely, execute U-turns). Defensive objecTo operationalize the process, we define a structured prompt
+tives, such as maintaining safe headway or avoiding collision,
+consisting
+of three components:
+are also integrated, aligning with safety-critical evaluation
+metrics. By conditioning on objectives, scenarios can be tailored
+• System preamble:
+to assess specific capabilities of planning and decision-making
+You are a driving scenario planner
+modules.
+for a highway simulator. Return a
+6) Difficulty and Traffic Density.: To control sceSINGLE valid JSON object that exactly
+matches the schema. Do not include
+nario challenge in a principled way, we vary difcomments or explanations|JSON ONLY.
+ficulty levels {easy, medium, hard} and traffic densities
+Scenario
+description f (s) and difficulty hints H(d), e.g.,
+•
+{low, medium, high}. Each difficulty level is mapped to struc“Scenario type: red-light dilemma, driver: aggressive, environtured constraints H(d) that define numerical thresholds for
+ment: foggy night, road: urban intersection, objective: avoid
+safety-critical quantities such as minimum time-to-collision
+collision, difficulty: hard, traffic density: high. Constraints:
+(TTC) and maximum admissible acceleration:
+min ttc=1.5s, max accel=6.0 m/s².”
+H(easy) = {min ttc = 4.0 s, max accel = 2.5 m/s2 },
+(3)
+H(medium) = {min ttc = 2.5 s, max accel = 4.0 m/s2 },
+(4)
+H(hard) = {min ttc = 1.5 s, max accel = 6.0 m/s2 }.
+(5)
+These constraints serve as structured hints to the LLM during
+scenario generation, ensuring that the resulting instances
+conform to quantifiable levels of risk and challenge.
+
+•
+
+Constraints:
+Respect physics: |accel| ≤ 6 m/s²,
+v_mps ≥ 0, lanes are 0-indexed.
+If traffic_light present: ego spawn.x
+≥ 30 m before stopline_x.
+duration_steps ≥ red_steps +
+green_steps.
+Include seed, policy_frequency, and
+all required fields.
+
+The generated JSON must conform to the schema C,
+summarized in Table III.
+Figure 3 presents an overview of the AgentDrive scenario
+By combining these axes, AgentDrive systematically dataset, which comprises around 300,000 samples, highlighting
+generates scenarios that balance routine coverage with ex- its diversity across difficulty levels, road layouts, and enviposure to rare, safety-critical events. This design positions ronmental conditions. Subfigure (a) shows a well-balanced
+AgentDrive not only as a diverse dataset but also as a distribution of scenario difficulty, with roughly one-third of the
+principled benchmark for robustness, safety, and generalization samples categorized as easy, medium, and hard. Subfigure (b)
+in autonomous systems powered by agentic AI.
+illustrates the correlation between layout type and difficulty,
+indicating that complex road structures—such as hairpin
+turns and cloverleaf interchanges—are generally associated
+C. Scenario Specification via LLM
+with higher difficulty levels. Subfigure (c) lists the ten most
+Once a scenario tuple is sampled, the next challenge is frequent road layouts, showcasing the dataset’s variety of
+to transform its abstract representation into a structured, geometric configurations. Subfigures (d)–(f) capture temporal
+semantically rich specification suitable for simulation. This and environmental diversity, showing that most scenarios
+transformation requires bridging symbolic scenario definitions occur during daytime, under good visibility, and in clear
+with executable formats that respect both linguistic expressive- weather—conditions that ensure both realism and safety-critical
+ness and physical realism.
+coverage for evaluating autonomous driving systems.
+
+8
+
+Distribution of Scenario Difficulty
+medium
+
+Layout × Difficulty (Counts)
+mountain
+switchback road
+
+Top 10 Road Layouts
+
+4000
+
+narrow bridge
+
+32.1%
+
+straight highway
+3800
+
+curved highway
+section
+
+3600
+
+Count
+
+layout
+
+hairpin turn
+bridge with icy
+deck
+weaving section
+between ramps
+double roundabout
+
+34.6%
+
+suspension bridge
+with crosswinds
+
+33.4%
+easy
+
+3400
+
+off-ramp diverge
+
+11,763
+
+narrow bridge
+
+11,696
+
+straight highway
+
+11,500
+
+curved highway
+section
+
+11,454
+
+hairpin turn
+
+11,169
+
+bridge with icy
+deck
+weaving section
+between ramps
+
+11,010
+10,887
+10,805
+
+double roundabout
+
+cloverleaf
+interchange
+multi-lane
+expressway
+
+10,687
+
+off-ramp diverge
+
+10,588
+
+iu
+
+rd
+
+ed
+
+ha
+
+0
+
+m
+
+ea
+
+suspension bridge
+with crosswinds
+
+m
+
+3200
+
+sy
+
+hard
+
+mountain
+switchback road
+
+2,000
+
+4,000
+
+6,000
+
+(a) Scenario Difficulty Distribution
+
+(b) Layout vs. Difficulty Heatmap
+
+Time of Day Distribution
+
+mixed
+
+48.7%
+
+7.3%
+
+sand/dust
+wind
+
+moderate
+
+6.5%
+
+fog
+
+58.3%
+
+day
+
+0.0%
+3.9%
+0.1%
+18.1%
+
+snow
+
+28.7%
+
+night
+
+44.8%
+
+good
+
+6.3%
+18.4%
+
+rain
+
+53.3%
+
+clear
+
+0%
+
+10%
+
+20%
+
+30%
+
+40%
+
+50%
+
+60%
+
+0%
+
+10%
+
+20%
+
+12,000
+
+Weather Distribution
+
+Visibility Distribution
+poor
+
+dawn
+
+10,000
+
+(c) Top 10 Road Layouts
+
+5.7%
+
+dusk
+
+8,000
+
+Count
+
+difficulty
+
+30%
+
+40%
+
+0%
+
+50%
+
+10%
+
+20%
+
+30%
+
+40%
+
+50%
+
+Share of scenarios (%)
+
+Share of scenarios (%)
+
+Share of scenarios (%)
+
+(d) Time of Day Distribution
+
+(e) Visibility Conditions
+
+(f) Weather Distribution
+
+Fig. 3: Distributions and layout statistics across the AgentDrive scenario dataset, showing difficulty levels, layout correlations,
+temporal and environmental characteristics.
+TABLE III: Schema for LLM-generated scenarios .
+
+Episode
+
+Segment
+
+Description / Constraints
+
+name
+Short slug, e.g., RedLight_Merge_v1
+seed
+Non-negative integer
+duration_steps Integer ≥
+60 (0.1s per step at
+policy frequency=10)
+road
+{lanes ≥ 2, speed_limit_kph ∈ [60, 140]}
+traffic_light
+Stopline position, red/green durations
+environment
+Weather, time of day, visibility
+layout
+Text description of road geometry
+objective
+Ego-vehicle task (e.g., avoid collision)
+difficulty
+easy|medium|hard
+traffic_density low|medium|high
+ego.spawn
+{x, y, v mps ≥ 0}, plus goal description
+traffic[]
+List of agents (type, behavior, lane, spawn, velocity)
+events[]
+Optional timed events (e.g., sudden brake, cut-in)
+metrics[]
+Evaluation metrics (TTC, headway, collisions)
+
+5,000,000
+
+5.16 · 106
+
+4,000,000
+
+Count
+
+Field
+
+3,000,000
+
+2,000,000
+1.79 · 106
+
+1,000,000
+
+1.15 · 106
+8.75 · 105
+
+D. Simulation Rollout Generation
+
+0
+
+Once a valid JSON specification ȷ̂ has been generated,
+the simulator M is implemented using the highway-env
+framework [25] and configured to produce a trajectory (or
+rollout):
+−1
+τ = {xt }Tt=0
+,
+(9)
+where T is the horizon determined by duration_steps,
+and each state xt ∈ Rd encodes ego-vehicle kinematics
+(position, velocity, acceleration), surrounding traffic states,
+traffic light signals, and relevant environmental parameters.
+The simulation time step is governed by the policy frequency:
+∆t =
+
+1
+.
+policy_frequency
+
+(10)
+
+1.02 · 105
+
+unsafe
+
+91,500
+
+75,900
+
+30,600
+
+safe-goal safe-stop inefficient
+
+Fig. 4: Label distribution of AgentDrive-Sim across
+episode and segment levels.
+
+The rollout τ captures the temporal dynamics of vehicle
+interactions, providing a reproducible and controllable environment for downstream analysis. The use of highway-env [25]
+allows for efficient prototyping and standardized simulation of
+diverse driving scenarios, including highway, intersection, and
+merging behaviors.
+
+9
+
+E. Surrogate Safety Metrics
+
+where each entry contains: the sampled scenario axes si , the
+generated JSON ȷ̂i , the resulting rollout τi , and the assigned
+label ℓi . To ensure coverage, we maximize entropy across
+scenario axes:
+X
+
+max
+H {axisi } ,
+(16)
+
+To evaluate safety outcomes at scale without requiring costly
+real-world testing, we rely on surrogate safety metrics. Among
+these, Time-to-Collision (TTC) is the primary indicator of
+criticality. The instantaneous TTC between ego vehicle E
+and its nearest lead vehicle V is:
+axis∈{t,b,e,r,o,d,q}
+
+
+ xV (t) − xE (t) , vE (t) > vV (t) ∧ xV (t) > xE (t), subject to schema compliance ȷ̂i ∈ C and valid rollouts τi .
+This entropy maximization prevents the dataset from colTTC(t) = vE (t) − vV (t)
+
+
+lapsing
+into trivial or repetitive cases, ensuring diversity across
++∞,
+otherwise,
+scenario
+types, behaviors, environments, and road layouts. The
+(11)
+resulting
+dataset thus captures both routine and rare conditions,
+where xE (t), xV (t) are longitudinal positions, and vE (t), vV (t)
+providing
+a rigorous benchmark for training and evaluating
+are velocities of ego and lead vehicles. The episode-level critical
+autonomous
+driving models under varied and safety-critical
+TTC is given by:
+contexts.
+TTCmin = min TTC(t).
+(12)
+t
+Algorithm 1: AgentDrive Scenario Generation and
+We define thresholds θunsafe = 0.5 s and θnear = 1.0 s,
+Labeling Pipeline
+consistent with established traffic safety analysis standards.
+1: Sample scenario tuple s ∼ S
+These thresholds allow us to classify events into unsafe,
+2: Construct enriched prompt P = P (s, H(d))
+3: Generate JSON ȷ̂ = Gϕ (P )
+near-miss, and safe zones. Such surrogate metrics provide
+4: Validate ȷ̂ against schema C; repair via Π up to R retries
+interpretable signals that map closely to real-world safety
+5: Simulate rollout τ = M(ȷ̂)
+concepts, enabling automated large-scale safety assessment.
+F. Rule-Based Labeling
+While continuous metrics quantify risk, categorical labels
+improve interpretability and facilitate supervised learning. From
+each rollout τ , we detect discrete events:
+collision = (ego crashed),
+red violation = (crossed stopline ∧ (light = Red)),
+stopped on red = (¬ crossed stopline ∧ (vE < ϵ) ∧ (light = Red)),
+crossed green = (crossed stopline ∧ (light = Green)).
+(13)
+
+6: Compute surrogate safety metrics (e.g., TTCmin )
+7: Detect events and assign categorical label ℓ via Eq. 14
+8: Store (s, ȷ̂, τ , ℓ) into dataset D
+
+H. End-to-End Scenario Generation Pipeline
+
+The overall pipeline is summarized in Algorithm 1. Each
+stage progressively refines the representation of a scenario,
+moving from abstract symbolic specifications to concrete
+simulation trajectories with interpretable safety labels. This
+layered transformation ensures that high-level abstractions such
+These events are mapped into high-level outcome labels:
+as “aggressive merging during rain” can be systematically
+Y = unsafe,
+if collision ∨ red violation ∨ TTCmin < θunsafe ,
+translated into structured inputs, simulated behaviors, and
+Y = safe_goal,
+if stopped on red ∧ crossed green,
+quantitative safety outcomes.
+Y = safe_stop,
+if stopped on red ∧ ¬crossed green,
+The process begins by sampling scenario tuples from the
+Y = inefficient, otherwise.
+multidimensional space S (Eq. 2), guaranteeing balanced
+(14)
+coverage across scenario types, driver behaviors, environmental
+This labeling strategy strikes a balance between precision
+conditions, and traffic densities. This systematic sampling
+and interpretability. It assigns outcomes recognizable to human
+provides exposure to both common conditions and rare, safetyexperts (e.g., unsafe, safe stop), thereby complementing concritical cases. Each tuple is then encoded into a prompt
+tinuous metrics with discrete ground truth categories. Fig. 4
+enriched with difficulty-specific hints H(d) (Eq. 6), which
+presents the label distribution of AgentDrive-Sim across
+conditions the large language model (LLM) to generate
+both episode and segment levels. The results show that at
+structured specifications that remain semantically meaningful
+the segment level, safe-goal instances dominate with more
+while adhering to physics and traffic safety constraints.
+than five million samples, followed by unsafe and inefficient
+The LLM produces a candidate JSON specification (Eq. 7),
+outcomes, whereas the episode-level distribution remains more
+which is validated against the schema C. Invalid generations
+balanced across all categories. This clear disparity highlights the
+are corrected by the post-processor Π, with retries up to R
+higher granularity and diversity of behaviors captured during
+attempts. This stage acts as a safeguard, ensuring that only
+segment-level analysis compared to aggregated episode-level
+semantically correct and physically plausible specifications
+evaluations.
+propagate downstream.
+Once a valid JSON is obtained, the simulator M generates a
+rollout trajectory τ (Eq. 9) that captures the temporal evolution
+G. Dataset Construction
+of the ego vehicle and surrounding agents under the defined sceAfter N iterations, we obtain the benchmark dataset:
+nario. This simulation grounds abstract descriptions in dynamic,
+D = {(si , ȷ̂i , τi , ℓi )}N
+,
+(15)
+reproducible trajectories. From τ , surrogate safety metrics
+i=1
+
+10
+
+TABLE IV: Notation used throughout the AgentDrive-MCQ
+dataset generation methodology.
+Symbol
+
+Block
+
+Definition
+
+S
+
+Scenario Input
+
+d
+m
+
+Description
+Model
+
+R
+Q
+O
+i∗
+
+Control
+MCQ Synthesis
+MCQ Synthesis
+MCQ Synthesis
+
+r
+
+MCQ Synthesis
+
+s
+
+Style Control
+
+δ
+Ms
+
+Validation
+Assembly
+
+h
+
+Assembly
+
+Validated scenario JSON containing structured
+fields
+Natural language narrative derived from S
+Large language model used for description/MCQ
+generation
+Retry budget for error-guided synthesis attempts
+Question text derived from description d
+Set of four candidate answer options
+Index of the correct choice (i∗
+∈
+{A, B, C, D})
+Concise textual rationale supporting the correct
+answer
+Reasoning
+style
+∈
+{physics, policy, hybrid,
+scenario, comparative}
+Difficulty level ∈ {Easy, Medium, Hard}
+Final MCQ object for style s linked to scenario
+S
+SHA-256 hash for persistent identifier of Ms
+
+v
+tr
+aego
+alead
+g
+τ
+
+Physics
+Physics/Policy
+Physics
+Physics
+Physics/Hybrid
+Policy
+
+ghyb
+
+Hybrid
+
+A
+
+Comparative
+
+Ego vehicle speed (m/s or km/h)
+Driver or agent reaction time (s)
+Ego vehicle deceleration capability (m/s2 )
+Lead/cut-in vehicle deceleration (m/s2 )
+Computed minimum safe headway distance (m)
+Time-gap rule (s), e.g., 2–4 seconds depending
+on conditions
+Headway including both physics-based minimum
+and policy margin (m)
+Candidate driving maneuver (e.g., brake, accelerate, change lane, maintain speed)
+
+such as TTCmin (Eq. 12) are computed, and discrete rulebased event detection is performed. The outcome is assigned
+a categorical label ℓ (Eq. 14)—safe_goal, safe_stop,
+inefficient, or unsafe—providing interpretable targets
+for benchmarking autonomous driving models.
+Finally, the complete record (s, ȷ̂, τ , ℓ) is stored in the dataset
+D (Eq. 15). Repeating this process across N iterations yields
+a diverse, large-scale benchmark that balances coverage and
+realism, forming the foundation of AgentDrive.
+IV. A G E N T D R I V E -MCQ B ENCHMARK
+A. Motivation
+Traditional benchmarks for autonomous driving agents
+have primarily emphasized perception and low-level control,
+including object detection, trajectory prediction, and actuation
+accuracy. While these tasks are essential, real-world driving
+introduces context-sensitive decision reasoning, where multiple
+heterogeneous factors such as weather conditions, traffic signals,
+surrounding vehicle behavior, and road geometry must be
+simultaneously integrated. This dimension of reasoning is often
+underexplored in existing datasets, which limits their ability to
+evaluate agents in high-stakes, safety-critical scenarios.
+To address this gap, we introduce AgentDrive-MCQ, a
+benchmark designed to probe the reasoning and decisionmaking capabilities of large language models (LLMs) when
+deployed as agentic controllers in autonomous driving. The
+central innovation lies in transforming structured driving
+scenarios into natural language descriptions and subsequently
+into multiple-choice questions (MCQs) that demand hard
+reasoning. Unlike simple factual Q&A, AgentDrive-MCQ
+
+Algorithm 2: AgentDrive-MCQ Generation
+Input: Validated scenario S (JSON-conformant), model m,
+retry budget R ≥ 1
+Output: Set of MCQ JSON objects {Mstyle } linked to S
+// Stage 1: Scenario → Description
+d ← G ENERATE D ESCRIPTION(S, m);
+Call LLM with constrained system prompt (10–12
+sentences, plain text only; include units; no lists/code);
+Normalize whitespace; truncate to a maximum
+token/word budget; attach as
+S[description] ← {model : m, text : d};
+Persist augmented copy as
+<scenario_name>_withdesc.json;
+// Stage 2: Description → MCQ Synthesis
+Across Five Styles
+foreach s ∈
+{physics, policy, hybrid, scenario, comparative}
+do
+(Q, O, i∗ , r) ← M AKE MCQ(d, m, s) with
+response_format=json_object;
+Validate style-specific constraints:
+physics/hybrid ⇒ numeric tokens in Q and O;
+scenario ⇒ qualitative, not all-numeric;
+comparative ⇒ ≥2 action-oriented options;
+Enforce general checks: |O| = 4; labels
+{A, B, C, D}; options distinct; |Q| ≤ 25 words;
+r ̸= ∅;
+If validation fails, retry with error-guided hint up to
+R times;
+// Stage 3: Assembly & Persistence
+foreach validated style s do
+Ms ← ⟨S[name], d, Q, O, i∗ , r, s⟩;
+h ← SHA256(d ∥ Q ∥ O ∥ i∗ ∥ s);
+Save Ms as
+<scenario_name>_{h[0:8]}_mcq_{s}.json;
+return {Ms };
+
+requires agents to synthesize information across multiple
+scenario layers and to select strategies aligned with safetycritical objectives.
+To capture the full spectrum of driving reasoning,
+AgentDrive-MCQ spans five complementary MCQ styles:
+Physics-based: numerically grounded questions requiring kinematic calculations such as time-to-collision or
+stopping distance.
+• Policy-based: questions emphasizing traffic rules, defensive driving guidelines, and safety heuristics.
+• Hybrid: items combining physics-derived calculations
+with additional policy or margin-based reasoning.
+• Scenario-interpretive: qualitative reasoning about primary risks, priorities, and contextual constraints.
+• Comparative/optimization: action-selection questions
+evaluating the relative safety of candidate maneuvers.
+•
+
+This taxonomy ensures that AgentDrive-MCQ not only
+evaluates mathematical reasoning, but also policy compliance,
+risk interpretation, and maneuver optimization—core facets of
+real-world driving intelligence. Correct answers are consistently
+aligned with safe driving strategies, anchoring the benchmark
+in risk-aware reasoning.
+
+11
+
+Fig. 5: The AgentDrive-MCQ framework.
+
+B. AgentDrive-MCQ: Dataset Generation Methodology
+
+LLMs, including DeepSeek-V3.1, GPT-4o, kimi-k2, and GPT5o. The LLM pool generates narrative scenario descriptions
+and subsequently produces five reasoning-intensive MCQs
+per scenario, corresponding to the physics, policy, hybrid,
+scenario, and comparative styles. The intermediate outputs are
+stored as labeled JSON files and passed through a cross-check
+validation stage to ensure consistency and correctness. Finally,
+the validated items are aggregated into the AgentDrive-MCQ
+dataset, providing a robust benchmark for evaluating contextsensitive reasoning under multi-factor constraints.
+
+We design a unified pipeline that consistently transforms
+structured scenarios into benchmark-ready MCQs across all
+five reasoning styles. The pipeline operates in three stages:
+(i) generating natural language descriptions, (ii) synthesizing
+reasoning-intensive MCQs in each style, and (iii) assembling
+validated MCQ objects with traceable identifiers. This staged
+design allows for scalable dataset expansion and systematic
+evaluation across diverse driving environments.
+The entire workflow is formalized in Algorithm 2. Starting
+from a validated scenario JSON, the first stage generates a D. Prompt Design and Control
+natural language description, constrained to 10–12 sentences,
+Two carefully engineered prompts underpin the pipeline. The
+and enriched with contextual details, including road layout,
+first, the Description Prompt, instructs the model to summarize
+environmental conditions, traffic controls, and dynamic vehicle
+the scenario in 10–12 sentences, covering road geometry,
+maneuvers. The second stage applies an LLM-based synthesis
+environmental conditions, traffic controls, and dynamic agent
+process to convert the description into five structured MCQ
+behaviors. The result is a compact, self-contained narrative
+JSONs, one per style. Each MCQ contains a concise question,
+that encodes all relevant constraints. The second, the MCQ
+four candidate answers, a single correct choice, and a textual
+Prompt, requires the model to generate a reasoning question
+rationale. Multiple validation checks (e.g., word length, option
+of high difficulty, with exactly four candidate answers and one
+distinctness, label format, numeric presence when required,
+correct choice. Depending on the style, additional constraints
+and action-orientation for comparative items) ensure structural
+enforce numeric presence (physics/hybrid), policy interpretation
+consistency, with automated retries in place when failures occur.
+(policy), qualitative reasoning (scenario), or action comparison
+The final stage assembles the outputs into persistent MCQ
+(comparative). Strict JSON formatting is imposed to enable
+objects, uniquely identified by content hashes, and stores them
+automatic parsing and reproducibility. This design ensures
+in the benchmark repository. This end-to-end design ensures
+that question difficulty emerges organically from scenario
+traceability, reproducibility, and robustness of the generated
+complexity and style-specific constraints, rather than from
+dataset.
+arbitrary distractor construction.
+The pipeline yields two structured outputs. The first is a
+description-augmented scenario JSON that retains the original
+C. Framework Illustration
+structured fields while enriching them with natural-language
+The overall architecture of the pipeline is depicted in descriptions. The second is a set of AgentDrive-MCQ
+Figure 5. The process begins with the AgentDrive dataset, JSONs, each corresponding to one of the five reasoning
+which encodes scenario attributes such as road layout, weather styles. Each JSON includes a description, a reasoning-intensive
+conditions, traffic density, and event triggers. These features question, four candidate answers, the correct answer, and a
+are formalized into JSON files that serve as the structured supporting rationale. This dual representation enables joint use
+representation of driving scenarios. A dedicated prompt builder in simulation-based evaluation and reasoning-based benchmarkthen reformulates the structured data into prompts for a pool of ing.
+
+12
+
+TABLE V: Accuracy (%) results of 50 examined LLM reasoning models evaluated across multiple reasoning styles using 2k
+samples from AgentDrive-MCQ.
+Model
+
+Company
+
+Size
+
+License
+
+Comparative
+
+Hybrid
+
+Physics
+
+Policy
+
+Scenario
+
+Overall
+
+ChatGPT 4o
+GPT-5 Chat
+Qwen3 235B A22B (2507)
+Mistral Medium 3.1
+GPT-4.1 Mini
+GPT-4.1
+Phi 4 Reasoning Plus
+Gemini 2.5 Flash
+Qwen3 Max
+ERNIE 4.5 300B A47B
+DeepSeek Chat V3 (0324)
+GPT-4o (2024-11-20)
+Qwen3 Next 80B A3B Ins
+Kimi Dev 72B
+Hermes 3 (Llama 3.1 405B)
+Llama 3.1 70B Instruct
+Llama-109B-MoE
+Kimi K2 (0905)
+Grok 3 Mini
+DeepSeek V3.1 Terminus
+Grok 4 Fast
+Kimi K2
+DeepSeek V3.2 Exp
+Claude 3.7 Sonnet (Thinking)
+Claude Opus 4.1
+GPT-4.1 Nano
+Gemma 3 12B IT
+Llama 3.3 70B Instruct
+Qwen Turbo
+Nova Micro V1
+Phi 3 Medium 128K Instruct
+Gemma 3 27B IT
+OLMo 2 32B Instruct
+GPT-4o Mini
+GPT-4o Mini (2024-07-18)
+WizardLM 2 8×22B
+Claude Sonnet 4.5
+Llama 4 Scout
+LFM 3B
+AFM 4.5B
+Llama 4 Maverick
+Command R7B (12-2024)
+Llama 3.1 8B Instruct
+Qwen 2.5 7B Instruct
+Llama 3.2 3B Instruct
+Llama 3.2 1B Instruct
+Mistral Nemo
+GPT-3.5 Turbo Instruct
+GLM 4.6
+GPT-OSS-120B
+GPT-OSS-20B
+
+OpenAI
+OpenAI
+Alibaba
+Mistral AI
+OpenAI
+OpenAI
+Microsoft
+Google
+Alibaba
+Baidu
+DeepSeek
+OpenAI
+Alibaba
+Moonshot AI
+Nous Research
+Meta
+DeepCogito
+Moonshot AI
+xAI
+DeepSeek
+xAI
+Moonshot AI
+DeepSeek
+Anthropic
+Anthropic
+OpenAI
+Google
+Meta
+Alibaba
+Amazon
+Microsoft
+Google
+AllenAI
+OpenAI
+OpenAI
+Microsoft
+Anthropic
+Meta
+Liquid AI
+Arcee AI
+Meta
+Cohere
+Meta
+Alibaba
+Meta
+Meta
+Mistral AI
+OpenAI
+Z-AI
+OpenAI
+OpenAI
+
+N/A
+N/A
+235B
+N/A
+N/A
+N/A
+14B
+391B
+N/A
+300B
+685B
+N/A
+80B
+72B
+405B
+70B
+109B
+1T
+N/A
+N/A
+N/A
+1T
+N/A
+N/A
+N/A
+N/A
+12B
+70B
+N/A
+N/A
+14B
+27B
+32B
+N/A
+N/A
+176B
+468B
+17B
+3B
+4.5B
+17B
+7B
+8B
+7B
+3B
+1B
+12B
+N/A
+N/A
+120B
+20B
+
+Proprietary
+Proprietary
+Open
+Proprietary
+Proprietary
+Proprietary
+Open
+Proprietary
+Open
+Open
+Open
+Proprietary
+Open
+Open
+Open
+Open
+Open
+Open
+Proprietary
+Open
+Proprietary
+Open
+Open
+Proprietary
+Proprietary
+Proprietary
+Open
+Open
+Open
+Proprietary
+Open
+Open
+Open
+Proprietary
+Proprietary
+Open
+Proprietary
+Open
+Open
+Open
+Open
+Open
+Open
+Open
+Open
+Open
+Open
+Proprietary
+Open
+Open
+Open
+
+90.0
+92.5
+92.5
+95.0
+90.0
+90.0
+95.0
+92.5
+95.0
+85.0
+77.5
+95.0
+82.5
+80.0
+82.5
+92.5
+87.5
+85.0
+82.5
+85.0
+87.5
+85.0
+85.0
+92.5
+92.5
+87.5
+57.5
+90.0
+87.5
+75.0
+82.5
+92.5
+57.5
+85.0
+85.0
+60.0
+75.0
+85.0
+67.5
+62.5
+77.5
+80.0
+62.5
+47.5
+52.5
+62.5
+65.0
+52.5
+60.0
+22.5
+17.5
+
+72.5
+70.0
+60.0
+60.0
+55.0
+50.0
+45.0
+65.0
+52.5
+45.0
+55.0
+55.0
+52.5
+57.5
+40.0
+52.5
+52.5
+50.0
+42.5
+32.5
+30.0
+32.5
+32.5
+40.0
+42.5
+17.5
+50.0
+47.5
+22.5
+15.0
+20.0
+27.5
+25.0
+20.0
+20.0
+45.0
+0.0
+22.5
+25.0
+27.5
+2.5
+7.5
+20.0
+12.5
+7.5
+10.0
+5.0
+5.0
+5.0
+5.0
+7.5
+
+55.0
+50.0
+67.5
+52.5
+50.0
+52.5
+47.5
+32.5
+47.5
+52.5
+45.0
+45.0
+40.0
+42.5
+57.5
+57.5
+45.0
+37.5
+37.5
+47.5
+42.5
+37.5
+55.0
+65.0
+10.0
+35.0
+50.0
+55.0
+30.0
+35.0
+30.0
+35.0
+45.0
+52.5
+52.5
+45.0
+0.0
+20.0
+40.0
+25.0
+5.0
+27.5
+27.5
+20.0
+35.0
+30.0
+12.5
+27.5
+2.5
+10.0
+0.0
+
+100
+100
+87.5
+97.5
+95.0
+90.0
+92.5
+92.5
+95.0
+95.0
+95.0
+85.0
+95.0
+87.5
+87.5
+52.5
+67.5
+80.0
+87.5
+85.0
+87.5
+90.0
+75.0
+42.5
+95.0
+97.5
+70.0
+27.5
+75.0
+90.0
+75.0
+35.0
+62.5
+30.0
+25.0
+25.0
+85.0
+25.0
+12.5
+32.5
+55.0
+20.0
+10.0
+50.0
+7.5
+7.5
+10.0
+5.0
+45.0
+10.0
+15.0
+
+95.0
+92.5
+97.5
+95.0
+97.5
+95.0
+97.5
+95.0
+95.0
+97.5
+95.0
+95.0
+95.0
+92.5
+90.0
+97.5
+97.5
+95.0
+97.5
+92.5
+90.0
+92.5
+90.0
+95.0
+92.5
+90.0
+85.0
+95.0
+90.0
+87.5
+90.0
+97.5
+90.0
+90.0
+90.0
+90.0
+95.0
+92.5
+92.5
+90.0
+95.0
+95.0
+90.0
+57.5
+80.0
+72.5
+90.0
+82.5
+37.5
+10.0
+7.5
+
+82.5
+81.0
+81.0
+80.0
+77.5
+75.5
+75.5
+75.5
+77.0
+75.0
+73.5
+75.0
+73.0
+72.0
+71.5
+70.5
+70.0
+69.5
+69.5
+68.5
+67.5
+67.5
+67.5
+67.0
+66.5
+65.5
+62.5
+63.0
+61.0
+60.5
+59.5
+57.5
+56.0
+55.5
+54.5
+53.0
+51.0
+49.0
+47.5
+47.5
+47.0
+46.0
+42.0
+37.5
+36.5
+36.5
+36.5
+34.5
+30.0
+11.5
+9.5
+
+LLM parameters: temperature = 0.0, which controls randomness (0 = deterministic output); max_tokens = 16, which defines the maximum number of tokens generated;
+top_p = 1.0, which is the nucleus sampling parameter (1.0 = all tokens considered); and max_retries = 5, which specifies the maximum number of retry attempts in case
+of LLM failure.
+
+V. LLM R EASONING P ERFORMANCE ON
+A G E N T D R I V E -MCQ
+
+training strategy influence performance, revealing that while
+frontier proprietary systems such as ChatGPT 4o and GPT-5
+Chat dominate contextual and policy-based reasoning, advanced
+The AgentDrive-MCQ benchmark provides a rigorous open models like Qwen3 235B A22B and ERNIE 4.5 300B
+evaluation framework for assessing the reasoning capabilities of A47B are rapidly closing the performance gap in structured,
+large language models across diverse driving-related scenarios. physics-grounded, and hybrid reasoning tasks.
+This section presents a comprehensive analysis of 50 leading
+LLMs, encompassing both proprietary and open-source architectures, and evaluates them across five reasoning dimensions: A. Performance Metrics Definition
+comparative, hybrid, physics, policy, and scenario. The goal
+The reasoning performance of each large language model
+is to identify strengths and weaknesses in model reasoning (LLM) in AgentDrive-MCQ is evaluated across five distinct
+under varied environmental, physical, and ethical constraints. reasoning dimensions: Comparative, Hybrid, Physics, Policy,
+The analysis highlights how model scale, architecture, and and Scenario. Each dimension represents a specific cogni-
+
+13
+
+A higher SCR reflects a model’s capability to comply with
+explicit safety regulations (e.g., traffic rules, right-of-way laws)
+and implicit ethical norms (e.g., harm minimization, risk-aware
+behavior) under uncertain or dynamic conditions. This metric
+thus serves as an indicator of safety alignment and regulatory
+robustness in autonomous decision-making.
+c) Situational Awareness Score (SAS): The Situational
+Awareness Score (SAS) quantifies a model’s capacity to
+perceive, interpret, and predict environmental dynamics—a core
+cognitive competence in safety-critical autonomous reasoning.
+It aggregates perception–reasoning alignment across three
+complementary reasoning styles:
+SAS =
+
+ωc · Comparative + ωh · Hybrid + ωf · Physics
+, (20)
+ωc + ωh + ωf
+
+where ωc , ωh , and ωf correspond to the relative weights
+assigned to Comparative, Hybrid, and Physics reasoning dimensions, respectively (default: ωc = ωh = ωf = 1). A higher
+SAS denotes enhanced situational comprehension—capturing
+spatial awareness, causal inference, and physical feasibility
+reasoning. Models achieving strong SAS values exhibit robust
+contextual understanding and predictive foresight, especially
+in edge-case or high-risk driving scenarios.
+Fig. 6: Top models by highest Overall: SAS vs. SCR.
+B. Overview of Model Performance
+tive ability required for robust, safety-aligned reasoning in
+autonomous driving contexts.
+a) Overall Accuracy: The accuracy for each reasoning
+style measures the proportion of correctly answered questions
+in that specific reasoning category:
+Accuracyj =
+
+Correct Responsesj
+× 100,
+Total Questionsj
+
+(17)
+
+where j ∈ {Comparative, Hybrid, Physics, Policy, Scenario}
+The Overall Accuracy serves as a unified indicator of model
+performance across all reasoning styles and is computed as:
+5
+
+Overall Accuracy =
+
+1X
+Accuracyj
+5 j=1
+
+(18)
+
+A higher overall accuracy reflects stronger reasoning consistency and generalization across heterogeneous driving scenarios.
+Beyond these primary accuracies, two derived reliability
+metrics provide deeper insight into model safety and awareness.
+b) Safety Compliance Rate (SCR): The Safety Compliance Rate (SCR) assesses the model’s adherence to normative
+driving policies and ethical safety principles embedded in regulatory or operational constraints. It integrates both procedural
+correctness (Policy) and behavioral consistency under realistic
+traffic situations (Scenario):
+SCR =
+
+ωp · Policy + ωs · Scenario
+,
+ωp + ωs
+
+(19)
+
+where ωp and ωs denote the relative importance weights of
+the Policy and Scenario dimensions (by default, ωp = ωs = 1).
+
+The comparative and categorical analysis of 50 evaluated
+LLMs on the AgentDrive-MCQ benchmark reveals significant diversity in reasoning performance across five distinct
+dimensions: comparative, hybrid, physics, policy, and scenario.
+As summarized in Table V, proprietary frontier models such as
+ChatGPT 4o (82.5%) and GPT-5 Chat (81.0%) from OpenAI
+dominated the benchmark, achieving perfect or near-perfect
+accuracy in policy (100%) and scenario (97.5%) reasoning tasks.
+These results underscore their superior contextual reasoning,
+ethical prioritization, and adaptability to complex decisionmaking scenarios. Among open-source systems, Qwen3 235B
+A22B reached a competitive 81.0% overall accuracy, leading
+in physics-driven reasoning (67.5%), while ERNIE 4.5 300B
+A47B achieved 75.0%, reflecting the growing maturity of
+Chinese foundation models. Other strong performers, including
+Mistral Medium 3.1 (80.0%) and GPT-4.1 Mini (77.5%),
+demonstrated balanced reasoning proficiency across multiple
+domains, highlighting the value of large-scale fine-tuning and
+domain adaptation.
+In contrast, smaller, earlier-generation models exhibited
+significant performance degradation. Models such as Llama
+3.1 8B Instruct (42.0%) and Qwen 2.5 7B Instruct (37.5%)
+underperformed in multi-modal reasoning tasks, particularly
+when physical or contextual inference was required. The hybrid
+reasoning category emerged as the most challenging, with even
+top-tier models—ChatGPT 4o (72.5%), GPT-5 Chat (70.0%),
+and Qwen3 235B A22B (60.0%)—struggling to integrate
+symbolic, numerical, and contextual information effectively.
+Conversely, mid-scale open models such as Kimi Dev 72B
+(72.0%) and DeepSeek V3.1 Terminus (68.5%) displayed
+encouraging stability, demonstrating that efficient architectures
+can approach the performance of frontier proprietary models
+
+14
+
+when supported by focused fine-tuning. Overall, the results
+confirm that model scale, training strategy, and architecture
+design are pivotal for achieving robust reasoning, with open
+ecosystems rapidly closing the gap in structured and physicsaware reasoning.
+C. SAS–SCR Correlation
+
+hazards. High-performing systems such as ChatGPT 4o and
+GPT-5 Chat achieved 100% accuracy, demonstrating mastery
+in policy alignment and context-sensitive judgment. However,
+smaller open models like Llama 3.1 8B Instruct (10.0%)
+and AFM 4.5B (32.5%) frequently failed to generalize safety
+rules, often choosing aggressive or unsafe responses. These
+results underscore the persistent gap between linguistic pattern
+recognition and actionable policy reasoning, suggesting that
+lightweight models require targeted, safety-aware fine-tuning
+to achieve reliable decision-making performance in regulatory
+and ethical reasoning domains.
+
+Fig. 6 visualizes the relationship between the Situational
+Awareness Score (SAS) and the Safety Compliance Rate (SCR)
+for the top models ranked by Overall Accuracy from Table V.
+The upper-right region of the scatter plot denotes the ideal
+operational zone, where models achieve both high situational F. Hybrid-Style Challenges
+awareness and strong safety compliance.
+The hybrid-style reasoning dimension emerged as the most
+The results clearly indicate that frontier proprietary models universally difficult in all model families—proprietary, open,
+such as ChatGPT 4o, GPT-5 Chat, and Qwen3 235B A22B and mid-scale. It required the simultaneous processing of
+dominate overall performance, reaching accuracies above 80 symbolic policy cues and quantitative calculations, especially
+%. Their SCR values exceed 95 %, and their SAS values in multi-constraint decision-making scenarios (e.g., braking
+remain in the 65–75 % range, demonstrating balanced reasoning on gravel, handling downhill deceleration, or reacting under
+between environmental understanding and safe decision-making. adverse weather). Even top-tier models such as ChatGPT 4o
+These findings highlight the maturity of large-scale, instruction- (72.5%) and GPT-5 Chat (70.0%) exhibited variability, while
+tuned architectures that integrate reasoning and physics-based open counterparts such as Qwen3 235B A22B (60.0%), Kimi
+inference effectively.
+Dev 72B (57.5%), and DeepSeek Chat V3 (55.0%) struggled
+Mid-tier open-source models, including Mistral Medium with precise multi-factor estimation. The observed pattern con3.1 and ERNIE 4.5 300B A47B, exhibit competitive safety firms that hybrid reasoning—requiring the fusion of conceptual
+compliance but somewhat lower SAS, suggesting stronger rule policy understanding and numerical grounding—remains an
+adherence but limited depth in contextual or physical reasoning. unresolved challenge in current LLM architectures. Future
+Such patterns emphasize that mastering safety alignment does model advancements must focus on improving cognitive
+not automatically yield situational adaptability. Overall, a compositionality and structured reasoning under uncertainty to
+positive correlation emerges between SCR and SAS—models achieve human-level reliability in hybrid decision environments.
+that understand complex physical environments tend also
+to make safer decisions. The clustering of high-performing G. Comparative-Style Challenges
+models in the upper-right quadrant of Fig. 6 validates that
+The comparative-style challenges assessed each model’s
+reasoning precision and safety compliance are complementary capacity to contrast multiple decision alternatives and identify
+competencies.
+the safest course of action under uncertain conditions. This
+dimension yielded generally strong results, with several models
+surpassing 90% accuracy. Mistral Medium 3.1 and Phi 4 ReaD. Physics-Style Challenges
+The most demanding physics-style questions tested the soning Plus achieved the highest comparative reasoning scores
+quantitative reasoning depth of the evaluated models, involving (95.0%), followed closely by Qwen3 Max and GPT-5 Chat
+complex physical dependencies such as traction, slope gradients, (92.5%). The dominance of large proprietary systems such
+and variable deceleration rates. Even the top-performing as ChatGPT 4o (90.0%) and Gemini 2.5 Flash (92.5%)
+models—GPT-5 Chat (50.0%), ChatGPT 4o (55.0%), and underscores the importance of fine-tuned instruction alignment
+Qwen3 235B A22B (67.5%)—showed reduced accuracy, re- for maintaining decision consistency. In contrast, small and
+flecting the inherent difficulty of reasoning about motion mid-scale open models—including Qwen 2.5 7B Instruct
+dynamics and braking trajectories under uncertainty. Despite (47.5%) and Llama 3.1 8B Instruct (62.5%)—struggled with
+their contextual fluency, these models often underestimated comparative reasoning, often failing to weigh competing
+or overestimated stopping distances, revealing weaknesses outcomes accurately. These results suggest that comparative
+in applying physical formulas to real-world conditions. The reasoning, while linguistically less demanding than numerical
+findings emphasize that LLMs, while linguistically proficient, estimation, still benefits from high-capacity contextual modelstill lack numerical grounding and consistency when dealing ing and refined safety-aware alignment. Overall, this dimension
+with multivariable safety equations critical to autonomous highlights the maturity of top-tier LLMs in structured choicemaking but also reveals that smaller open models lack the
+driving.
+inferential depth required to handle multi-option trade-offs
+reliably.
+E. Policy-Style Challenges
+The policy-style reasoning category primarily assessed the H. Scenario-Style Challenges
+models’ ability to interpret traffic rules, safety margins, and
+Scenario-style challenges required a holistic understanding
+prioritization policies under constrained visibility or dynamic of complex, dynamic environments with multiple interacting
+
+15
+
+factors such as weather, visibility, and traffic density. This
+category produced some of the highest individual accuracies
+across the benchmark. Models like ChatGPT 4o, GPT-5 Chat,
+Phi 4 Reasoning Plus, Qwen3 Max, and ERNIE 4.5 300B A47B
+each achieved near-perfect scenario reasoning scores (97.5%),
+demonstrating exceptional situational awareness and context
+synthesis. These systems consistently identified safe maneuvers
+by integrating spatial, temporal, and regulatory cues. In contrast,
+mid-tier models such as DeepSeek Chat V3 (95.0%) and
+Kimi Dev 72B (92.5%) remained strong but slightly less
+consistent in handling unexpected hazards or environmental
+uncertainty. Smaller models—such as Llama 3.2 3B Instruct
+(80.0%) or Gemma 3 12B IT (85.0%)—showed substantial
+performance degradation, often missing implicit contextual
+dependencies. The overall trend indicates that scenario-based
+reasoning is the most stable and generalizable dimension for
+frontier models, as it combines perception, rule-following,
+and reasoning depth. However, achieving consistent real-world
+interpretability under diverse environmental conditions remains
+an open research challenge for the broader LLM ecosystem.
+VI. C ONCLUSION
+In this paper, we presented AgentDrive, a comprehensive
+open benchmark dataset designed to advance the training,
+fine-tuning, and evaluation of agentic AI systems in autonomous driving. Built upon a large-scale corpus of 300,000
+LLM-generated driving scenarios, AgentDrive introduced
+a factorized scenario space that captured the complexity and
+diversity of real-world environments through seven orthogonal
+dimensions: scenario type, driver behavior, environment, road
+layout, objective, difficulty, and traffic density. An LLMdriven prompt-to-JSON specification pipeline ensured semantic
+richness, physical validity, and simulation readiness, while
+surrogate safety metrics and rule-based labeling provided
+interpretable ground truth for supervised learning and reasoning
+analysis.
+To complement simulation-based evaluation, we proposed
+AgentDrive-MCQ, a reasoning-oriented benchmark containing 100,000 multiple-choice questions designed to assess the
+cognitive, ethical, and physics-grounded reasoning capabilities
+of LLM-based agents. We conducted a large-scale evaluation
+of fifty state-of-the-art LLMs—including GPT-5, ChatGPT 4o,
+Gemini 2.5 Flash, DeepSeek V3, Qwen3 235B, ERNIE 4.5
+300B, Grok 4, and Mistral Medium 3.1—which demonstrated
+that while proprietary models currently dominate in contextual
+and policy reasoning, advanced open models rapidly closed
+the gap in structured and physics-based reasoning.
+AgentDrive and AgentDrive-MCQ together provided
+a framework for benchmarking and improving agentic AI
+reasoning in safety-critical autonomous systems. Beyond evaluation, these resources enabled large-scale model training, finetuning, and transfer learning across simulation and reasoning
+domains. In future work, we plan to extend AgentDrive to
+multi-agent and multimodal environments, integrate real-world
+sensor data, and explore alignment strategies to further enhance
+the reliability and interpretability of LLM-driven autonomous
+agents.
+
+To support open science and reproducibility, we released the complete AgentDrive dataset, labeled scenarios,
+AgentDrive-MCQ benchmark, Google Colab evaluation
+scripts, and all related materials on GitHub.
+R EFERENCES
+[1] Z. Yang, X. Jia, H. Li, and J. Yan, “Llm4drive: A survey of large language
+models for autonomous driving,” arXiv preprint arXiv:2311.01043, 2023.
+[2] C. Cui, Y. Ma, Z. Yang, Y. Zhou, P. Liu, J. Lu, L. Li, Y. Chen, J. H.
+Panchal, A. Abdelraouf et al., “Large language models for autonomous
+driving (llm4ad): Concept, benchmark, experiments, and challenges,”
+arXiv preprint arXiv:2410.15281, 2024.
+[3] C. Cui, Y. Ma, X. Cao, W. Ye, Y. Zhou, K. Liang, J. Chen, J. Lu, Z. Yang,
+K.-D. Liao et al., “A survey on multimodal large language models for
+autonomous driving,” in Proceedings of the IEEE/CVF winter conference
+on applications of computer vision, 2024, pp. 958–979.
+[4] Y. Gao, M. Piccinini, Y. Zhang, D. Wang, K. Moller, R. Brusnicki,
+B. Zarrouki, A. Gambi, J. F. Totz, K. Storms et al., “Foundation models
+in autonomous driving: A survey on scenario generation and scenario
+analysis,” arXiv preprint arXiv:2506.11526, 2025.
+[5] Y. Huang, J. Sansom, Z. Ma, F. Gervits, and J. Chai, “Drivlme:
+Enhancing llm-based autonomous driving agents with embodied and
+social experiences,” in 2024 IEEE/RSJ International Conference on
+Intelligent Robots and Systems (IROS). IEEE, 2024, pp. 3153–3160.
+[6] T. Cai, Y. Liu, Z. Zhou, H. Ma, S. Z. Zhao, Z. Wu, and J. Ma,
+“Driving with regulation: Interpretable decision-making for autonomous
+vehicles with retrieval-augmented reasoning via llm,” arXiv preprint
+arXiv:2410.04759, 2024.
+[7] X. Kong, T. Braunl, M. Fahmi, and Y. Wang, “A superalignment
+framework in autonomous driving with large language models,” in 2024
+IEEE Intelligent Vehicles Symposium (IV). IEEE, 2024, pp. 1715–1720.
+[8] Y. Bai, D. Wu, Y. Liu, F. Jia, W. Mao, Z. Zhang, Y. Zhao, J. Shen, X. Wei,
+T. Wang et al., “Is a 3d-tokenized llm the key to reliable autonomous
+driving?” arXiv preprint arXiv:2405.18361, 2024.
+[9] C. K. Sah, A. K. Shaw, X. Lian, A. S. Baig, T. Wen, K. Jiang, M. Yang,
+and D. Yang, “Advancing autonomous vehicle intelligence: Deep learning
+and multimodal llm for traffic sign recognition and robust lane detection,”
+arXiv preprint arXiv:2503.06313, 2025.
+[10] Y. Jin and J. Ma, “Large language model as parking planning agent in
+the context of mixed period of autonomous vehicles and human-driven
+vehicles,” Sustainable Cities and Society, vol. 117, p. 105940, 2024.
+[11] L. Chen, O. Sinavski, J. Hünermann, A. Karnsund, A. J. Willmott,
+D. Birch, D. Maund, and J. Shotton, “Driving with llms: Fusing objectlevel vector modality for explainable autonomous driving,” in 2024 IEEE
+International Conference on Robotics and Automation (ICRA). IEEE,
+2024, pp. 14 093–14 100.
+[12] Z. Xu, Y. Zhang, E. Xie, Z. Zhao, Y. Guo, K.-Y. K. Wong, Z. Li, and
+H. Zhao, “Drivegpt4: Interpretable end-to-end autonomous driving via
+large language model,” IEEE Robotics and Automation Letters, 2024.
+[13] T. Zhang, T. Jin, L. Wang, J. Liu, S. Liang, M. Zhang, A. Liu, and
+X. Liu, “Bench2advlm: A closed-loop benchmark for vision-language
+models in autonomous driving,” arXiv preprint arXiv:2508.02028, 2025.
+[14] X. Cao, T. Zhou, Y. Ma, W. Ye, C. Cui, K. Tang, Z. Cao, K. Liang,
+Z. Wang, J. M. Rehg et al., “Maplm: A real-world large-scale visionlanguage benchmark for map and traffic scene understanding,” in
+Proceedings of the IEEE/CVF conference on computer vision and pattern
+recognition, 2024, pp. 21 819–21 830.
+[15] Y. Ma, C. Cui, X. Cao, W. Ye, P. Liu, J. Lu, A. Abdelraouf, R. Gupta,
+K. Han, A. Bera et al., “Lampilot: An open benchmark dataset for
+autonomous driving with language model programs,” in Proceedings of
+the IEEE/CVF conference on computer vision and pattern recognition,
+2024, pp. 15 141–15 151.
+[16] Z. Tang, J. He, D. Pe, K. Liu, T. Gao, and J. Zheng, “Test large language
+models on driving theory knowledge and skills for connected autonomous
+vehicles,” in Proceedings of the 19th Workshop on Mobility in the
+Evolving Internet Architecture, 2024, pp. 1–6.
+[17] H.-k. Chiu, R. Hachiuma, C.-Y. Wang, S. F. Smith, Y.-C. F. Wang,
+and M.-H. Chen, “V2v-llm: Vehicle-to-vehicle cooperative autonomous
+driving with multi-modal large language models,” arXiv preprint
+arXiv:2502.09980, 2025.
+[18] K. Lebioda, N. Petrovic, F. Pan, V. Zolfaghari, A. Schamschurko, and
+A. Knoll, “Are requirements really all you need? using llms to generate
+configuration code: A case study in automotive simulations,” IEEE Access,
+2025.
+
+16
+
+[19] Y. Yao, S. Bhatnagar, M. Mazzola, V. Belagiannis, I. Gilitschenski,
+L. Palmieri, S. Razniewski, and M. Hallgarten, “Agents-llm: Augmentative generation of challenging traffic scenarios with an agentic llm
+framework,” arXiv preprint arXiv:2507.13729, 2025.
+[20] J. Zhou, Y. Zhao, A. Yang, and A. Eichberger, “Benchmarking large
+language models for motorway driving scenario understanding,” SAE
+Technical Paper, Tech. Rep., 2025.
+[21] C. Fruhwirth-Reisinger, D. Malić, W. Lin, D. Schinagl, S. Schulter,
+and H. Possegger, “Stsbench: A spatio-temporal scenario benchmark
+for multi-modal large language models in autonomous driving,” arXiv
+preprint arXiv:2506.06218, 2025.
+[22] Z. Wei, C. Qiang, B. Jiang, X. Han, X. Yu, and Z. Han, “Adˆ 2-bench:
+A hierarchical cot benchmark for mllm in autonomous driving under
+adverse conditions,” arXiv preprint arXiv:2506.09557, 2025.
+[23] D. Pei, Y. Wu, J. He, K. Liu, M. Chen, X. Xiao, S. Zhang, and J. Zheng,
+“Methodology and benchmark for automated driving theory test of large
+language models,” IEEE Transactions on Intelligent Transportation
+Systems, 2025.
+[24] S. Xie, L. Kong, Y. Dong, C. Sima, W. Zhang, Q. A. Chen, Z. Liu,
+and L. Pan, “Are vlms ready for autonomous driving? an empirical
+study from the reliability, data, and metric perspectives,” arXiv preprint
+arXiv:2501.04003, 2025.
+[25] E. Leurent, “An environment for autonomous driving decision-making,”
+https://github.com/eleurent/highway-env, 2018.
+
+
