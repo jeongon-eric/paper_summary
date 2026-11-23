@@ -1,0 +1,1855 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#080a14">
+<title>역사 한 입 · 한국사·세계사·교양 퀴즈</title>
+<style>
+:root{
+  --bg:#07080f;
+  --panel:#0e1122;
+  --card:rgba(255,255,255,.055);
+  --card2:rgba(255,255,255,.035);
+  --line:rgba(255,255,255,.10);
+  --line2:rgba(255,255,255,.16);
+  --txt:#eef1ff;
+  --dim:#98a1c0;
+  --dim2:#6c7595;
+  --gold:#ffce5c;
+  --gold2:#ff9d4d;
+  --kr:#ff8080;
+  --wh:#5cc8ff;
+  --gk:#b78dff;
+  --ok:#3fe0a2;
+  --no:#ff6b81;
+  --radius:22px;
+  --tab-h:74px;
+}
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+html{background:#05060c}
+body{
+  background:#05060c;
+  color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Malgun Gothic",system-ui,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+  overscroll-behavior-y:contain;
+  letter-spacing:-.01em;
+}
+button{font-family:inherit;color:inherit;background:none;border:0;cursor:pointer;letter-spacing:inherit;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+h1,h2,h3,p{margin:0}
+ul{margin:0;padding:0;list-style:none}
+
+#app{
+  position:relative;
+  max-width:480px;
+  margin:0 auto;
+  min-height:100dvh;
+  display:flex;
+  flex-direction:column;
+  background:
+    radial-gradient(120% 60% at 50% -10%, #1a2044 0%, rgba(26,32,68,0) 60%),
+    radial-gradient(90% 50% at 110% 30%, rgba(120,60,200,.18) 0%, rgba(120,60,200,0) 60%),
+    radial-gradient(80% 45% at -10% 70%, rgba(255,120,60,.10) 0%, rgba(255,120,60,0) 60%),
+    linear-gradient(180deg,#0c1024 0%,#080a16 45%,#06070f 100%);
+  background-attachment:local;
+  overflow:hidden;
+  isolation:isolate;
+}
+#app::before{
+  content:"";
+  position:absolute;inset:0;
+  background-image:radial-gradient(rgba(255,255,255,.085) 1px, transparent 1px);
+  background-size:26px 26px;
+  mask-image:linear-gradient(180deg,rgba(0,0,0,.5),transparent 55%);
+  pointer-events:none;z-index:0;
+}
+#app::after{
+  content:"";
+  position:absolute;left:50%;top:-120px;width:420px;height:420px;transform:translateX(-50%);
+  background:radial-gradient(circle,rgba(255,206,92,.16),transparent 65%);
+  filter:blur(20px);pointer-events:none;z-index:0;
+  animation:halo 9s ease-in-out infinite alternate;
+}
+@keyframes halo{from{opacity:.55;transform:translateX(-50%) scale(.95)}to{opacity:.95;transform:translateX(-50%) scale(1.08)}}
+
+/* ---------- screens ---------- */
+.screen{
+  position:relative;z-index:1;
+  display:none;flex:1;
+  padding:0 18px calc(var(--tab-h) + 18px + env(safe-area-inset-bottom));
+}
+.screen.active{display:block;animation:screenIn .34s cubic-bezier(.2,.85,.3,1)}
+@keyframes screenIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* ---------- hero / home ---------- */
+.hero{padding:calc(18px + env(safe-area-inset-top)) 0 0}
+.hero-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px;letter-spacing:.02em}
+.logo .dot{width:26px;height:26px;border-radius:9px;display:grid;place-items:center;font-size:14px;
+  background:linear-gradient(150deg,var(--gold),var(--gold2));color:#231a05;box-shadow:0 4px 14px rgba(255,170,60,.35)}
+.hello{color:var(--dim);font-size:13.5px;font-weight:600;margin-bottom:8px}
+.hero-title{font-size:30px;line-height:1.24;font-weight:800;letter-spacing:-.035em}
+.hero-title em{font-style:normal;background:linear-gradient(100deg,var(--gold) 10%,#ffb35c 55%,#ff7a8a 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.title-badge{display:inline-flex;align-items:center;gap:6px;margin-top:14px;padding:7px 13px;border-radius:99px;
+  font-size:12px;font-weight:700;color:var(--gold);background:rgba(255,206,92,.10);border:1px solid rgba(255,206,92,.28)}
+.title-badge.empty{color:var(--dim);background:rgba(255,255,255,.05);border-color:var(--line)}
+
+.streak{
+  display:flex;align-items:center;gap:12px;margin-top:18px;padding:13px 16px;border-radius:16px;
+  background:linear-gradient(100deg rgba(255,120,80,.14),rgba(255,120,80,.03));
+  background:linear-gradient(100deg,rgba(255,120,80,.16),rgba(255,120,80,.03));
+  border:1px solid rgba(255,140,90,.22);
+}
+.streak .flame{font-size:20px;filter:drop-shadow(0 0 8px rgba(255,120,60,.7))}
+.streak .txt{font-size:13px;color:#ffd9c9}
+.streak .txt b{color:#ffb08a;font-size:15px}
+.streak .best{margin-left:auto;font-size:11.5px;color:var(--dim);font-weight:600}
+
+.section-label{display:flex;align-items:center;justify-content:space-between;margin:26px 2px 11px}
+.section-label h2{font-size:13px;font-weight:800;color:var(--dim);letter-spacing:.06em}
+.section-label .hint{font-size:11.5px;color:var(--dim2);font-weight:600}
+
+/* daily card */
+.daily{position:relative;overflow:hidden;border-radius:26px;padding:20px;
+  background:linear-gradient(140deg,#3a2a12 0%,#241a20 45%,#171527 100%);
+  border:1px solid rgba(255,206,92,.30);box-shadow:0 18px 40px -22px rgba(255,170,60,.65)}
+.daily::after{content:"";position:absolute;right:-40px;top:-50px;width:170px;height:170px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,206,92,.35),transparent 70%);filter:blur(6px)}
+.daily .tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.08em;
+  color:#ffdf9a;background:rgba(255,206,92,.14);border:1px solid rgba(255,206,92,.3);padding:5px 10px;border-radius:8px}
+.daily h3{font-size:22px;font-weight:800;margin:13px 0 6px;letter-spacing:-.03em}
+.daily p{font-size:13px;color:#d8cdb8;line-height:1.5}
+.daily .foot{display:flex;align-items:center;gap:10px;margin-top:16px}
+.daily .done{font-size:12px;font-weight:700;color:var(--ok)}
+.btn-primary{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+  min-height:52px;border-radius:16px;font-size:16px;font-weight:800;letter-spacing:-.02em;
+  background:linear-gradient(135deg,#ffd979,#ffab4d);color:#241a05;
+  box-shadow:0 10px 24px -10px rgba(255,180,70,.85);
+  transition:transform .15s ease,box-shadow .15s ease;
+}
+.btn-primary:active{transform:scale(.975);box-shadow:0 6px 16px -10px rgba(255,180,70,.8)}
+.btn-ghost{
+  min-height:52px;padding:0 18px;border-radius:16px;font-size:14px;font-weight:700;color:var(--txt);
+  background:rgba(255,255,255,.07);border:1px solid var(--line);
+}
+
+/* category grid */
+.cats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.cat{
+  position:relative;text-align:left;padding:15px 12px 14px;border-radius:20px;overflow:hidden;
+  background:var(--card);border:1px solid var(--line);
+  transition:transform .15s ease,border-color .2s;
+}
+.cat:active{transform:scale(.97)}
+.cat .ico{font-size:24px;display:block;margin-bottom:26px;filter:drop-shadow(0 4px 10px rgba(0,0,0,.5))}
+.cat .nm{font-size:14px;font-weight:800;display:block}
+.cat .bs{display:block;font-size:11px;color:var(--dim);margin-top:3px;font-weight:600}
+.cat .ring{position:absolute;right:10px;top:10px;font-size:10px;font-weight:800;color:var(--dim2)}
+.cat.k{border-color:rgba(255,128,128,.26);background:linear-gradient(160deg,rgba(255,128,128,.16),rgba(255,128,128,.03) 70%)}
+.cat.w{border-color:rgba(92,200,255,.26);background:linear-gradient(160deg,rgba(92,200,255,.16),rgba(92,200,255,.03) 70%)}
+.cat.g{border-color:rgba(183,141,255,.26);background:linear-gradient(160deg,rgba(183,141,255,.16),rgba(183,141,255,.03) 70%)}
+.cat.k .ico{filter:drop-shadow(0 0 14px rgba(255,128,128,.45))}
+.cat.w .ico{filter:drop-shadow(0 0 14px rgba(92,200,255,.45))}
+.cat.g .ico{filter:drop-shadow(0 0 14px rgba(183,141,255,.45))}
+
+/* survival */
+.surv{margin-top:10px;display:flex;align-items:center;gap:14px;padding:17px 18px;border-radius:22px;
+  background:linear-gradient(120deg,rgba(255,107,129,.16),rgba(255,107,129,.03) 60%),var(--card2);
+  border:1px solid rgba(255,107,129,.26)}
+.surv .ico{font-size:26px}
+.surv .t{flex:1}
+.surv .t b{display:block;font-size:15.5px;font-weight:800}
+.surv .t span{display:block;font-size:11.5px;color:var(--dim);margin-top:3px}
+.surv .hearts{font-size:13px;letter-spacing:1px}
+.surv .go{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:15px;
+  background:rgba(255,107,129,.18);border:1px solid rgba(255,107,129,.35);color:#ffc2cb}
+
+/* stats strip */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.stat{padding:14px 12px;border-radius:18px;background:var(--card2);border:1px solid var(--line);text-align:center}
+.stat b{display:block;font-size:19px;font-weight:800;letter-spacing:-.02em}
+.stat span{display:block;font-size:11px;color:var(--dim);margin-top:3px;font-weight:600}
+
+/* ---------- quiz ---------- */
+#screen-quiz{padding:0 16px calc(14px + env(safe-area-inset-bottom));display:none;flex-direction:column}
+#screen-quiz.active{display:flex}
+#screen-result{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+.quiz-head{display:flex;align-items:center;gap:12px;padding:calc(14px + env(safe-area-inset-top)) 2px 10px}
+.icon-btn{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:15px;
+  color:var(--dim);background:rgba(255,255,255,.055);border:1px solid var(--line);flex:0 0 auto}
+.icon-btn:active{transform:scale(.94)}
+.progress-track{flex:1;height:8px;border-radius:99px;background:rgba(255,255,255,.085);overflow:hidden}
+.progress-fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#ffd979,#ff9d5c);
+  transition:width .35s cubic-bezier(.2,.8,.3,1)}
+.hud-score{font-size:14px;font-weight:800;color:var(--gold);min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.quiz-sub{display:flex;align-items:center;gap:8px;padding:0 2px 10px;min-height:28px}
+.chip{font-size:11.5px;font-weight:800;padding:6px 10px;border-radius:9px;background:rgba(255,255,255,.07);border:1px solid var(--line);color:#cfd6ef;max-width:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip.k{color:#ffb3b3;background:rgba(255,128,128,.12);border-color:rgba(255,128,128,.3)}
+.chip.w{color:#a9e2ff;background:rgba(92,200,255,.12);border-color:rgba(92,200,255,.3)}
+.chip.g{color:#d5c2ff;background:rgba(183,141,255,.12);border-color:rgba(183,141,255,.3)}
+.hearts{margin-left:auto;font-size:14px;letter-spacing:2px;color:#ff8a9b;filter:drop-shadow(0 0 6px rgba(255,90,120,.5))}
+.hearts .off{opacity:.22;filter:none}
+.combo-badge{margin-left:auto;font-size:12px;font-weight:800;color:#ffc06a;padding:5px 10px;border-radius:9px;
+  background:rgba(255,170,80,.13);border:1px solid rgba(255,170,80,.28);opacity:0;transform:scale(.8);transition:.2s}
+.combo-badge.on{opacity:1;transform:none}
+.combo-badge.pop{animation:pop .42s cubic-bezier(.2,1.6,.4,1)}
+@keyframes pop{0%{transform:scale(.7)}60%{transform:scale(1.18)}100%{transform:scale(1)}}
+.timer-track{height:4px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden;margin:0 2px 0;opacity:0;transition:opacity .2s}
+.timer-track.on{opacity:1}
+.timer-fill{height:100%;width:100%;border-radius:99px;background:var(--ok)}
+.timer-fill.warn{background:#ffbb55}
+.timer-fill.danger{background:var(--no)}
+
+.q-wrap{flex:1;min-height:0;display:flex;flex-direction:column;padding-top:20px;overflow-y:auto;scrollbar-width:none}
+.q-wrap::-webkit-scrollbar{display:none}
+.q-index{font-size:11.5px;font-weight:800;letter-spacing:.14em;color:var(--dim2);margin-bottom:10px}
+.q-text{font-size:22.5px;line-height:1.42;font-weight:800;letter-spacing:-.035em;margin-bottom:22px;word-break:keep-all}
+.q-hint{font-size:12px;color:var(--dim2);margin:-14px 0 18px;font-weight:600}
+.choices{display:flex;flex-direction:column;gap:10px;padding-bottom:12px}
+.choice{
+  display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;
+  padding:16px 15px;border-radius:18px;font-size:15.5px;line-height:1.42;font-weight:600;
+  color:var(--txt);background:rgba(255,255,255,.045);border:1px solid var(--line);
+  transition:transform .13s ease,background .18s,border-color .18s,opacity .2s;
+  word-break:keep-all;
+}
+.choice:active{transform:scale(.982);background:rgba(255,255,255,.08)}
+.choice .key{
+  flex:0 0 26px;width:26px;height:26px;border-radius:9px;display:grid;place-items:center;
+  font-size:12px;font-weight:800;color:var(--dim);background:rgba(255,255,255,.08);margin-top:-1px;
+  transition:.18s;
+}
+.choice.correct{background:rgba(63,224,162,.15);border-color:rgba(63,224,162,.65);color:#d6fff0}
+.choice.correct .key{background:rgba(63,224,162,.9);color:#04281c}
+.choice.wrong{background:rgba(255,107,129,.14);border-color:rgba(255,107,129,.65);color:#ffdfe4}
+.choice.wrong .key{background:rgba(255,107,129,.9);color:#2b0510}
+.choice.dim{opacity:.42}
+.ox-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;padding-bottom:12px}
+.ox{
+  height:148px;border-radius:26px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font-size:58px;font-weight:800;line-height:1;background:rgba(255,255,255,.045);border:1.5px solid var(--line);
+  transition:transform .13s ease,background .2s,border-color .2s,opacity .2s;
+}
+.ox:active{transform:scale(.965)}
+.ox small{font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--dim2);margin-top:6px}
+.ox[data-v="O"]{color:var(--wh);background:radial-gradient(circle at 50% 35%,rgba(92,200,255,.17),rgba(92,200,255,.035));border-color:rgba(92,200,255,.32)}
+.ox[data-v="X"]{color:#ff8d9d;background:radial-gradient(circle at 50% 35%,rgba(255,107,129,.17),rgba(255,107,129,.035));border-color:rgba(255,107,129,.32)}
+.ox.correct{background:rgba(63,224,162,.2);border-color:rgba(63,224,162,.75);color:#8effcd;box-shadow:0 0 30px -8px rgba(63,224,162,.55)}
+.ox.wrong{background:rgba(255,107,129,.2);border-color:rgba(255,107,129,.75)}
+.ox.dim{opacity:.35}
+
+.float-score{
+  position:fixed;left:50%;top:34%;transform:translate(-50%,0);z-index:60;pointer-events:none;
+  font-size:30px;font-weight:900;color:var(--gold);text-shadow:0 4px 18px rgba(255,170,60,.55);
+  animation:floatUp 1s ease-out forwards;
+}
+@keyframes floatUp{0%{opacity:0;transform:translate(-50%,10px) scale(.8)}25%{opacity:1;transform:translate(-50%,-6px) scale(1.1)}100%{opacity:0;transform:translate(-50%,-64px) scale(1)}}
+
+/* ---------- feedback sheet ---------- */
+.sheet{
+  position:fixed;left:50%;bottom:0;z-index:70;width:100%;max-width:480px;
+  transform:translate(-50%,105%);
+  background:linear-gradient(180deg,#1a1e36 0%,#111426 55%,#0c0f1e 100%);
+  border-radius:28px 28px 0 0;border:1px solid var(--line2);border-bottom:0;
+  padding:10px 18px calc(16px + env(safe-area-inset-bottom));
+  box-shadow:0 -24px 60px -12px rgba(0,0,0,.8);
+  transition:transform .38s cubic-bezier(.2,.9,.25,1);
+  max-height:74dvh;display:flex;flex-direction:column;
+}
+.sheet.show{transform:translate(-50%,0)}
+.sheet .grab{width:38px;height:4px;border-radius:99px;background:rgba(255,255,255,.2);margin:4px auto 14px;flex:0 0 auto}
+.sheet-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex:0 0 auto}
+.res-ico{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;font-size:20px;flex:0 0 auto}
+.res-ico.ok{background:rgba(63,224,162,.16);color:var(--ok);border:1px solid rgba(63,224,162,.4)}
+.res-ico.no{background:rgba(255,107,129,.16);color:var(--no);border:1px solid rgba(255,107,129,.4)}
+.sheet-head .tt{font-size:17px;font-weight:800;letter-spacing:-.02em}
+.sheet-head .tt small{display:block;font-size:11.5px;font-weight:600;color:var(--dim);margin-top:2px}
+.sheet-head .pts{margin-left:auto;font-size:16px;font-weight:900;color:var(--gold);font-variant-numeric:tabular-nums}
+.sheet-body{overflow-y:auto;overscroll-behavior:contain;flex:1;min-height:0;padding-right:2px}
+.sheet-body::-webkit-scrollbar{width:0}
+.ex-label{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:.1em;color:var(--gold);
+  padding:4px 8px;border-radius:7px;background:rgba(255,206,92,.1);border:1px solid rgba(255,206,92,.22);margin-bottom:9px}
+.ex-text{font-size:14.5px;line-height:1.62;color:#d9def2;word-break:keep-all;margin-bottom:14px}
+.ex-answer{font-size:12.5px;color:var(--dim);margin-bottom:10px;font-weight:600}
+.ex-answer b{color:#d7e3ff}
+.btn-next{
+  width:100%;min-height:54px;border-radius:16px;font-size:16px;font-weight:800;
+  background:linear-gradient(135deg,#ffd979,#ffab4d);color:#241a05;flex:0 0 auto;margin-top:6px;
+  box-shadow:0 10px 24px -12px rgba(255,180,70,.9);
+}
+.btn-next:active{transform:scale(.985)}
+.btn-next.dark{background:rgba(255,255,255,.1);color:var(--txt);box-shadow:none;border:1px solid var(--line2)}
+
+/* ---------- result ---------- */
+.res-wrap{padding:calc(26px + env(safe-area-inset-top)) 0 0;text-align:center}
+.res-kicker{font-size:12px;font-weight:800;letter-spacing:.16em;color:var(--dim2)}
+.res-score{font-size:64px;font-weight:900;letter-spacing:-.05em;line-height:1.05;margin:8px 0 2px;
+  background:linear-gradient(120deg,#fff2c9,#ffce5c 45%,#ff9d5c);-webkit-background-clip:text;background-clip:text;color:transparent;
+  font-variant-numeric:tabular-nums}
+.res-score small{font-size:18px;letter-spacing:0;margin-left:4px;-webkit-text-fill-color:var(--dim);color:var(--dim)}
+.res-mode{font-size:13.5px;color:var(--dim);font-weight:600}
+.record{display:inline-flex;align-items:center;gap:6px;margin:14px 3px 0;padding:7px 14px;border-radius:99px;
+  font-size:12px;font-weight:800;color:#1d1503;background:linear-gradient(120deg,#ffe08a,#ffb35c);
+  box-shadow:0 8px 22px -10px rgba(255,180,80,.9);animation:recordIn .6s cubic-bezier(.2,1.5,.4,1)}
+@keyframes recordIn{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+.res-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:24px 0 6px}
+.res-cell{padding:14px 8px;border-radius:17px;background:var(--card2);border:1px solid var(--line)}
+.res-cell b{display:block;font-size:19px;font-weight:800;letter-spacing:-.02em}
+.res-cell span{display:block;font-size:10.5px;color:var(--dim);margin-top:4px;font-weight:700}
+.res-cell b.ok{color:var(--ok)}
+.res-cell b.no{color:var(--no)}
+.unlocked{margin-top:18px;text-align:left;padding:15px 16px;border-radius:18px;
+  background:linear-gradient(130deg,rgba(255,206,92,.13),rgba(255,206,92,.03));border:1px solid rgba(255,206,92,.28)}
+.unlocked .h{font-size:11px;font-weight:800;letter-spacing:.1em;color:var(--gold);margin-bottom:8px}
+.unlocked .a{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;padding:4px 0}
+.unlocked .a .i{font-size:16px}
+.res-actions{display:flex;gap:10px;margin-top:22px}
+.res-actions .btn-primary{flex:1.4}
+.res-actions .btn-ghost{flex:1}
+.res-note{margin-top:16px;font-size:12px;color:var(--dim2);line-height:1.5;min-height:18px}
+
+/* ---------- collection ---------- */
+.page-head{padding:calc(20px + env(safe-area-inset-top)) 0 4px}
+.page-head h1{font-size:26px;font-weight:800;letter-spacing:-.04em}
+.page-head p{font-size:12.5px;color:var(--dim);margin-top:6px}
+.seg{display:flex;gap:4px;margin:18px 0 16px;padding:4px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.seg button{flex:1;padding:10px 4px;border-radius:11px;font-size:12.5px;font-weight:800;color:var(--dim);transition:.18s}
+.seg button.on{background:rgba(255,255,255,.12);color:var(--txt);box-shadow:0 2px 10px rgba(0,0,0,.3)}
+.empty{text-align:center;padding:48px 20px;color:var(--dim)}
+.empty .i{font-size:40px;display:block;margin-bottom:12px;opacity:.8}
+.empty b{display:block;font-size:15px;color:#cfd6ef;margin-bottom:6px;font-weight:800}
+.empty span{font-size:12.5px;line-height:1.6;display:block}
+
+.wrong-item{padding:15px 16px;border-radius:18px;background:var(--card2);border:1px solid var(--line);margin-bottom:10px}
+.wrong-item .top{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.wrong-item .cat{font-size:10.5px;font-weight:800;padding:3px 7px;border-radius:6px;background:rgba(255,255,255,.07);color:var(--dim)}
+.wrong-item .cat.k{color:#ffb3b3;background:rgba(255,128,128,.13)}
+.wrong-item .cat.w{color:#a9e2ff;background:rgba(92,200,255,.13)}
+.wrong-item .cat.g{color:#d5c2ff;background:rgba(183,141,255,.13)}
+.wrong-item .cnt{margin-left:auto;font-size:10.5px;color:var(--dim2);font-weight:700}
+.wrong-item .q{font-size:14.5px;font-weight:700;line-height:1.45;margin-bottom:10px;word-break:keep-all}
+.wrong-item .ans{font-size:12px;line-height:1.6;color:var(--dim)}
+.wrong-item .ans b{color:var(--ok);font-weight:700}
+.wrong-item .ans s{color:var(--no);text-decoration:none}
+.wrong-item .ex{font-size:12.5px;line-height:1.62;color:#b9c2dd;margin-top:7px;padding-top:9px;border-top:1px dashed rgba(255,255,255,.09)}
+.wrong-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.wrong-head .n{font-size:12.5px;color:var(--dim);font-weight:700}
+.wrong-head .btn-ghost{margin-left:auto;min-height:38px;height:38px;padding:0 13px;border-radius:11px;font-size:12px}
+
+.title-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.title-card{padding:14px;border-radius:16px;background:var(--card2);border:1px solid var(--line);text-align:left;transition:.16s}
+.title-card:active{transform:scale(.98)}
+.title-card .i{font-size:19px}
+.title-card b{display:block;font-size:13px;font-weight:800;margin-top:8px}
+.title-card span{display:block;font-size:10.5px;color:var(--dim);margin-top:3px;line-height:1.4}
+.title-card.on{border-color:rgba(255,206,92,.55);background:linear-gradient(150deg,rgba(255,206,92,.15),rgba(255,206,92,.03))}
+.title-card.locked{opacity:.42}
+.title-card .use{display:inline-block;margin-top:8px;font-size:10px;font-weight:800;color:var(--gold)}
+.title-card.locked .use{color:var(--dim2)}
+
+.ach{display:flex;align-items:center;gap:13px;padding:13px 14px;border-radius:16px;background:var(--card2);border:1px solid var(--line);margin-bottom:8px}
+.ach .i{width:40px;height:40px;flex:0 0 40px;border-radius:13px;display:grid;place-items:center;font-size:19px;background:rgba(255,255,255,.06);filter:grayscale(1);opacity:.45}
+.ach.on .i{filter:none;opacity:1;background:linear-gradient(140deg,rgba(255,206,92,.22),rgba(255,206,92,.06));border:1px solid rgba(255,206,92,.3)}
+.ach .b b{display:block;font-size:13.5px;font-weight:800}
+.ach .b span{display:block;font-size:11.5px;color:var(--dim);margin-top:2px;line-height:1.4}
+.ach .ck{margin-left:auto;font-size:13px;color:var(--ok);font-weight:800}
+.ach.locked .b b{color:#aab2cc}
+
+.stat-line{margin-bottom:14px}
+.stat-line .r{display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;margin-bottom:7px}
+.stat-line .r span{color:var(--dim)}
+.stat-line .track{height:8px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}
+.stat-line .fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--gold),#ff9d5c);transition:width .6s}
+.stat-line.k .fill{background:linear-gradient(90deg,#ff8f8f,#ff5f7a)}
+.stat-line.w .fill{background:linear-gradient(90deg,#6fd1ff,#3d8bff)}
+.stat-line.g .fill{background:linear-gradient(90deg,#c9a6ff,#8b5cff)}
+.stat-cards{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:22px}
+.stat-cards .sc{padding:14px;border-radius:16px;background:var(--card2);border:1px solid var(--line)}
+.stat-cards .sc b{display:block;font-size:20px;font-weight:800}
+.stat-cards .sc span{display:block;font-size:11px;color:var(--dim);margin-top:3px;font-weight:600}
+
+/* ---------- settings ---------- */
+.set-row{display:flex;align-items:center;gap:12px;padding:16px 4px;border-bottom:1px solid rgba(255,255,255,.07)}
+.set-row .t{flex:1}
+.set-row .t b{display:block;font-size:14.5px;font-weight:700}
+.set-row .t span{display:block;font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.4}
+.sw{width:50px;height:30px;border-radius:99px;background:rgba(255,255,255,.14);position:relative;transition:.2s;flex:0 0 auto}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.2s}
+.sw.on{background:linear-gradient(120deg,#ffd979,#ffab4d)}
+.sw.on::after{left:23px}
+.danger{width:100%;margin-top:22px;min-height:50px;border-radius:15px;font-size:13.5px;font-weight:800;color:#ff9aa8;
+  background:rgba(255,107,129,.09);border:1px solid rgba(255,107,129,.3)}
+.about{margin-top:26px;padding:16px;border-radius:18px;background:var(--card2);border:1px solid var(--line);font-size:12px;color:var(--dim);line-height:1.7}
+.about b{color:#cdd5ee}
+
+/* ---------- tabbar ---------- */
+.tabbar{
+  position:fixed;left:50%;bottom:0;transform:translateX(-50%);z-index:30;
+  width:100%;max-width:480px;display:flex;gap:4px;
+  padding:8px 14px calc(8px + env(safe-area-inset-bottom));
+  background:rgba(9,11,22,.86);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-top:1px solid rgba(255,255,255,.08);
+}
+.tabbar.hide{display:none}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0 5px;border-radius:14px;
+  color:var(--dim2);font-size:10.5px;font-weight:700;transition:.16s}
+.tab .ti{font-size:17px;line-height:1;filter:grayscale(.6);opacity:.75}
+.tab.on{color:var(--gold);background:rgba(255,206,92,.07)}
+.tab.on .ti{filter:none;opacity:1}
+
+/* ---------- toast / modal ---------- */
+.toast{
+  position:fixed;left:50%;top:calc(18px + env(safe-area-inset-top));transform:translate(-50%,-140%);z-index:90;
+  max-width:420px;width:calc(100% - 40px);
+  display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:16px;
+  background:linear-gradient(120deg,#2a2410,#1a1a2b);border:1px solid rgba(255,206,92,.4);
+  box-shadow:0 16px 40px -14px rgba(0,0,0,.9);transition:transform .4s cubic-bezier(.2,.9,.25,1);
+  font-size:12.5px;font-weight:700;
+}
+.toast.show{transform:translate(-50%,0)}
+.toast .ti{font-size:18px}
+.toast b{display:block;font-size:12.5px;color:var(--gold)}
+.toast span{display:block;font-size:11px;color:var(--dim);margin-top:1px;font-weight:600}
+
+.modal-bg{position:fixed;inset:0;background:rgba(4,5,10,.72);backdrop-filter:blur(4px);z-index:80;
+  display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-bg.show{opacity:1;pointer-events:auto}
+.modal{width:100%;max-width:330px;border-radius:24px;padding:22px 20px;background:linear-gradient(160deg,#1b2038,#121526);
+  border:1px solid var(--line2);box-shadow:0 30px 80px -20px #000;transform:scale(.94);transition:transform .22s}
+.modal-bg.show .modal{transform:none}
+.modal h3{font-size:17px;font-weight:800;margin-bottom:8px;letter-spacing:-.02em}
+.modal p{font-size:13px;color:var(--dim);line-height:1.6;margin-bottom:18px}
+.modal .row{display:flex;gap:8px}
+.modal .row button{flex:1;min-height:46px;border-radius:13px;font-size:14px;font-weight:800}
+.modal .row .cancel{background:rgba(255,255,255,.08);border:1px solid var(--line);color:var(--dim)}
+.modal .row .ok{background:linear-gradient(120deg,#ffd979,#ffab4d);color:#241a05}
+.modal .row .ok.red{background:linear-gradient(120deg,#ff8a9b,#ff5f7a);color:#2b0510}
+
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:65;overflow:hidden}
+.confetti i{position:absolute;width:8px;height:8px;border-radius:2px;animation:fall linear forwards}
+@keyframes fall{from{transform:translateY(-10vh) rotate(0)}to{transform:translateY(105vh) rotate(680deg);opacity:.2}}
+
+.hidden{display:none !important}
+@media (max-height:680px){
+  .hero-title{font-size:26px}
+  .q-text{font-size:20px}
+  .ox{height:118px;font-size:48px}
+  .res-score{font-size:54px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="screen-home" class="screen active">
+    <header class="hero">
+      <div class="hero-bar">
+        <div class="logo"><span class="dot">🍽️</span><span>역사 한 입</span></div>
+        <button id="btn-sound-home" class="icon-btn" aria-label="소리 켜기/끄기">🔊</button>
+      </div>
+      <p class="hello" id="hello">정우 님, 오늘도 한 입 하실래요?</p>
+      <h1 class="hero-title">알면 알수록<br><em>재밌는</em> 역사 · 교양</h1>
+      <div id="title-badge"></div>
+    </header>
+    <div id="home-body"></div>
+  </section>
+
+  <section id="screen-quiz" class="screen">
+    <div class="quiz-head">
+      <button class="icon-btn" id="btn-quit" aria-label="그만두기">✕</button>
+      <div class="progress-track"><div class="progress-fill" id="q-progress"></div></div>
+      <div class="hud-score" id="q-score">0</div>
+    </div>
+    <div class="quiz-sub">
+      <div class="chip" id="q-chip">한국사</div>
+      <div class="hearts" id="q-hearts"></div>
+      <div class="combo-badge" id="q-combo">🔥 0</div>
+    </div>
+    <div class="timer-track" id="timer-track"><div class="timer-fill" id="timer-fill"></div></div>
+    <div class="q-wrap" id="q-wrap">
+      <div class="q-index" id="q-index">Q1</div>
+      <h2 class="q-text" id="q-text"></h2>
+      <div id="q-choices" class="choices"></div>
+    </div>
+  </section>
+
+  <section id="screen-result" class="screen"><div id="result-body"></div></section>
+
+  <section id="screen-collection" class="screen">
+    <div class="page-head">
+      <h1>도감</h1>
+      <p>틀린 문제와 칭호, 나의 기록을 모아봤어요.</p>
+    </div>
+    <div class="seg" id="seg">
+      <button data-seg="wrong" class="on">오답 노트</button>
+      <button data-seg="titles">칭호</button>
+      <button data-seg="stats">기록</button>
+    </div>
+    <div id="collection-body"></div>
+  </section>
+
+  <section id="screen-settings" class="screen">
+    <div class="page-head">
+      <h1>설정</h1>
+      <p>게임 환경과 저장된 기록을 관리해요.</p>
+    </div>
+    <div id="settings-body"></div>
+  </section>
+
+  <nav id="tabbar" class="tabbar">
+    <button class="tab on" data-tab="home"><span class="ti">🏠</span><span>홈</span></button>
+    <button class="tab" data-tab="collection"><span class="ti">📖</span><span>도감</span></button>
+    <button class="tab" data-tab="settings"><span class="ti">⚙️</span><span>설정</span></button>
+  </nav>
+
+  <div id="sheet" class="sheet" aria-live="polite">
+    <div class="grab"></div>
+    <div id="sheet-body"></div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"><span class="ti">🏅</span><div><b id="toast-title"></b><span id="toast-desc"></span></div></div>
+  <div id="confetti" class="confetti"></div>
+  <div id="modal-bg" class="modal-bg"><div class="modal" id="modal"></div></div>
+</div>
+<script>
+/* =========================================================
+   문제 은행 — 한국사 24 · 세계사 24 · 교양 상식 24 (총 72문)
+   ========================================================= */
+const CATS = {
+  korean:  { name:'한국사',   icon:'🏯', cls:'k', desc:'삼국시대부터 근현대까지' },
+  world:   { name:'세계사',   icon:'🌍', cls:'w', desc:'고대 문명부터 냉전까지' },
+  general: { name:'교양 상식', icon:'💡', cls:'g', desc:'과학·예술·철학·지리' }
+};
+
+const QUESTIONS = [
+  /* ---------------- 한국사 ---------------- */
+  {id:'k01',cat:'korean',tag:'삼국시대',type:'mc',
+   q:'고구려 광개토대왕의 업적을 기리려고 아들 장수왕이 세운 비석은?',
+   choices:['광개토대왕릉비','충주 고구려비','북한산 순수비','살수대첩비'],answer:0,
+   ex:'장수왕은 414년 아버지의 정복 활동을 남기려고 지금의 중국 지린성 지안에 거대한 비석을 세웠어요. 1,800여 자가 새겨진 이 비는 삼국 시대사를 복원하는 일급 사료로 꼽힙니다.'},
+
+  {id:'k02',cat:'korean',tag:'삼국시대',type:'ox',
+   q:'삼국 가운데 불교를 가장 먼저 공인한 나라는 신라이다.',
+   choices:['O','X'],answer:1,
+   ex:'가장 먼저 불교를 받아들인 나라는 고구려예요. 372년 소수림왕 때 전진의 승려 순도를 통해 공인했고, 백제는 384년, 신라는 한참 뒤인 527년 법흥왕 때 공인이 이루어졌습니다.'},
+
+  {id:'k03',cat:'korean',tag:'삼국시대',type:'mc',
+   q:'신라의 귀족 회의인 화백회의에서 결정을 내리는 방식은?',
+   choices:['만장일치','다수결','왕의 최종 결정','제비뽑기'],answer:0,
+   ex:'화백회의는 성골·진골 귀족들이 모여 나라의 큰일을 논의하던 회의체로, 한 사람이라도 반대하면 결정하지 않는 만장일치 원칙을 지켰어요. 그래서 신라 정치를 "귀족들의 합의 정치"라고 부릅니다.'},
+
+  {id:'k04',cat:'korean',tag:'고려',type:'mc',
+   q:'고려 시대 음력 11월에 열린, 토속 신앙과 불교가 어우러진 국가 제사 의례는?',
+   choices:['팔관회','연등회','동맹','제천행사'],answer:0,
+   ex:'팔관회는 하늘과 땅, 산천의 신에게 제사 지내며 나라의 평안을 빌던 고려의 대표 행사예요. 부처님 오신 날인 음력 2월의 연등회와 함께 고려의 양대 국가 행사로 꼽혔습니다.'},
+
+  {id:'k05',cat:'korean',tag:'조선',type:'mc',
+   q:'세종대왕이 훈민정음을 세상에 반포한 해는?',
+   choices:['1443년','1446년','1392년','1490년'],answer:1,
+   ex:'훈민정음은 1443년에 만들어졌고, 해설을 붙인 《훈민정음 해례본》이 1446년에 반포됐어요. 이 해례본은 1997년 유네스코 세계기록유산으로 등재됐습니다.'},
+
+  {id:'k06',cat:'korean',tag:'고려말·조선초',type:'mc',
+   q:'1388년 이성계가 요동 정벌 명령을 뒤집고 군사를 개경으로 돌린 사건은?',
+   choices:['위화도 회군','홍건적의 난','무신정변','쌍성총관부 수복'],answer:0,
+   ex:'이성계는 압록강 위화도에서 군사를 돌려 최영을 제거하고 권력을 잡았어요. 이 회군이 4년 뒤 조선 건국의 발판이 됐습니다.'},
+
+  {id:'k07',cat:'korean',tag:'조선',type:'mc',
+   q:'이순신이 한산도 앞바다에서 학의 날개 모양 진형으로 왜군을 무찌른 해전은?',
+   choices:['한산도 대첩','명량 대첩','노량 해전','옥포 해전'],answer:0,
+   ex:'1592년 7월 한산도 대첩에서 이순신은 학익진을 펼쳐 왜군 함선 60여 척을 격파했어요. 행주 대첩, 진주 대첩과 함께 임진왜란 3대 대첩으로 불립니다.'},
+
+  {id:'k08',cat:'korean',tag:'조선',type:'mc',
+   q:'정조가 아버지 사도세자의 묘를 옮기며 쌓은, 정약용의 거중기가 동원된 성곽은?',
+   choices:['수원 화성','남한산성','북한산성','행주산성'],answer:0,
+   ex:'수원 화성은 1794년부터 1796년까지 쌓은 계획 도시형 성곽이에요. 정약용이 고안한 거중기를 써서 무거운 돌을 들어 올렸고, 그 기록이 《화성성역의궤》에 남아 있습니다.'},
+
+  {id:'k09',cat:'korean',tag:'조선 후기',type:'mc',
+   q:'《목민심서》를 지어 지방 관리의 올바른 자세를 강조한 실학자는?',
+   choices:['정약용','박제가','홍대용','정상기'],answer:0,
+   ex:'정약용은 유배지 강진에서 《목민심서》와 《흠흠신서》를 썼어요. 함께 실학자로 꼽히는 박제가는 중국의 앞선 기술을 배우자고 주장한 《북학의》를 남겼습니다.'},
+
+  {id:'k10',cat:'korean',tag:'근대',type:'mc',
+   q:'1894년 "보국안민"을 내걸고 고부에서 봉기한 동학농민운동의 지도자는?',
+   choices:['전봉준','최제우','홍범도','김좌진'],answer:0,
+   ex:'전봉준은 고부 군수 조병갑의 수탈에 맞서 농민들을 이끌었어요. 동학을 창시한 최제우는 1860년대 인물이고, 홍범도와 김좌진은 훗날 독립군을 이끈 인물입니다.'},
+
+  {id:'k11',cat:'korean',tag:'일제강점기',type:'mc',
+   q:'1919년 3·1 운동이 일어나는 데 직접적인 계기가 된 사건은?',
+   choices:['2·8 독립선언','갑신정변','을미사변','국채보상운동'],answer:0,
+   ex:'1919년 2월 8일 도쿄 유학생들이 독립을 선언하자, 이 소식에 자극받아 국내에서 3월 1일 만세 시위가 터졌어요. 이 운동은 대한민국 임시정부 수립으로 이어졌습니다.'},
+
+  {id:'k12',cat:'korean',tag:'일제강점기',type:'mc',
+   q:'1919년 수립된 대한민국 임시정부가 처음 자리를 잡은 도시는?',
+   choices:['상하이','베이징','하와이','이르쿠츠크'],answer:0,
+   ex:'임시정부는 1919년 4월 11일 상하이에서 수립을 선포하고 연통제를 통해 국내와 연결했어요. 이후 충칭까지 옮겨 다니며 독립운동의 구심점 역할을 했습니다.'},
+
+  {id:'k13',cat:'korean',tag:'근현대',type:'ox',
+   q:'1945년 8월 15일, 우리나라는 일제강점기에서 벗어났다.',
+   choices:['O','X'],answer:0,
+   ex:'1945년 8월 15일 일본이 무조건 항복을 선언하면서 35년의 일제강점기가 끝났어요. 다만 남북이 38도선으로 갈라지며 분단의 씨앗도 함께 싹텄습니다.'},
+
+  {id:'k14',cat:'korean',tag:'근현대',type:'mc',
+   q:'6·25 전쟁이 시작된 해는?',
+   choices:['1948년','1950년','1953년','1960년'],answer:1,
+   ex:'1950년 6월 25일 새벽 북한군이 38도선을 넘어 남침하면서 전쟁이 시작됐어요. 1953년 7월 27일 휴전협정으로 전투는 멈췄지만 평화협정은 아직 맺어지지 않았습니다.'},
+
+  {id:'k15',cat:'korean',tag:'고려',type:'mc',
+   q:'고려청자 표면을 파내고 다른 흙을 메워 무늬를 만드는 기법은?',
+   choices:['상감','음각','양각','투각'],answer:0,
+   ex:'상감 기법은 12세기 중엽 고려청자에서 꽃을 피웠어요. 흑백의 대비가 은은한 상감청자는 중국에도 없던 고려만의 독창적 기법으로 평가받습니다.'},
+
+  {id:'k16',cat:'korean',tag:'조선',type:'mc',
+   q:'세종 때 압록강 상류에 4군을 개척한 장수는?',
+   choices:['최윤덕','김종서','권율','유성룡'],answer:0,
+   ex:'최윤덕은 여연 등 4군을, 김종서는 두만강 유역에 6진을 개척했어요. 이때 정비된 국경선이 오늘날 한반도 북부 경계의 바탕이 됐습니다.'},
+
+  {id:'k17',cat:'korean',tag:'남북국시대',type:'ox',
+   q:'발해를 세운 사람은 왕건이다.',
+   choices:['O','X'],answer:1,
+   ex:'발해는 698년 고구려 출신 대조영이 동모산에서 세웠어요. 9세기 선왕 때 최대 영토를 이루며 "해동성국"이라 불렸고, 왕건은 고려를 세운 인물입니다.'},
+
+  {id:'k18',cat:'korean',tag:'삼국시대',type:'mc',
+   q:'신라가 당군을 몰아내고 삼국 통일을 완성한 해는?',
+   choices:['660년','668년','676년','698년'],answer:2,
+   ex:'660년 백제, 668년 고구려가 멸망했지만 전쟁은 거기서 끝나지 않았어요. 676년 기벌포와 매소성에서 당군을 몰아낸 뒤에야 신라의 삼국 통일이 완성됐습니다.'},
+
+  {id:'k19',cat:'korean',tag:'조선',type:'mc',
+   q:'"태정태세문단세"에서 세종의 뒤를 이은 왕은?',
+   choices:['문종','단종','태종','성종'],answer:0,
+   ex:'세종의 아들 문종은 1450년 즉위했지만 2년 만에 세상을 떠났어요. 어린 단종이 왕위를 이었고, 이를 계기로 세조의 왕위 찬탈이 일어납니다.'},
+
+  {id:'k20',cat:'korean',tag:'선사시대',type:'ox',
+   q:'고인돌은 청동기 시대를 대표하는 거대한 돌무덤이다.',
+   choices:['O','X'],answer:0,
+   ex:'고인돌은 청동기 시대 지배층의 무덤으로, 한반도에만 3만 기 넘게 남아 있어요. 고창·화순·강화 고인돌 유적은 2000년 유네스코 세계문화유산으로 등재됐습니다.'},
+
+  {id:'k21',cat:'korean',tag:'고려',type:'mc',
+   q:'단군 신화를 전하는 《삼국유사》를 지은 승려는?',
+   choices:['일연','김부식','의천','원효'],answer:0,
+   ex:'《삼국유사》는 1281년 무신정권 시기 일연이 지었어요. 김부식의 《삼국사기》는 1145년에 편찬된 정사로, 두 책은 서로 다른 시선으로 삼국 시대를 보여줍니다.'},
+
+  {id:'k22',cat:'korean',tag:'근대',type:'mc',
+   q:'1876년 조선이 일본과 맺은 최초의 근대적 조약은?',
+   choices:['강화도 조약','을사늑약','한성 조약','제물포 조약'],answer:0,
+   ex:'강화도 조약은 1875년 운요호 사건을 계기로 맺어졌어요. 부산 외 2개 항구 개항, 해안 측량권, 일본인 치외법권 등을 허용해 불평등 조약의 시작이 됐습니다.'},
+
+  {id:'k23',cat:'korean',tag:'근대',type:'mc',
+   q:'1896년 서재필 등이 만든, 자주국권과 입헌군주제를 내세운 단체는?',
+   choices:['독립협회','신민회','대한자강회','헌정연구회'],answer:0,
+   ex:'독립협회는 독립문을 세우고 만민공동회를 열어 여론을 모았어요. 1898년 정부의 탄압으로 해산됐지만, 근대 민권 운동의 출발점으로 평가받습니다.'},
+
+  {id:'k24',cat:'korean',tag:'근현대',type:'mc',
+   q:'1960년 3·15 부정선거에 항의하며 학생과 시민이 일으킨 민주 항쟁은?',
+   choices:['4·19 혁명','5·18 민주화운동','6월 민주항쟁','3·1 운동'],answer:0,
+   ex:'4·19 혁명으로 이승만 대통령이 하야했어요. 5·18은 1980년 광주, 6월 민주항쟁은 1987년에 일어난 다른 민주화 운동입니다.'},
+
+  /* ---------------- 세계사 ---------------- */
+  {id:'w01',cat:'world',tag:'고대 이집트',type:'mc',
+   q:'기자에 있는 세계 최대 피라미드를 세운 이집트 왕은?',
+   choices:['쿠푸','투탕카멘','람세스 2세','클레오파트라'],answer:0,
+   ex:'기자의 대피라미드는 기원전 2560년경 쿠푸 왕의 무덤으로 지어졌어요. 약 230만 개의 돌로 쌓았고, 4,500년이 지난 지금도 원형을 간직하고 있습니다.'},
+
+  {id:'w02',cat:'world',tag:'고대 메소포타미아',type:'ox',
+   q:'함무라비 법전은 고대 이집트에서 만들어진 법전이다.',
+   choices:['O','X'],answer:1,
+   ex:'함무라비 법전은 메소포타미아의 바빌로니아 왕 함무라비가 기원전 18세기에 만든 성문법이에요. "눈에는 눈, 이에는 이"의 동해보복 원칙이 담겨 있습니다.'},
+
+  {id:'w03',cat:'world',tag:'고대 그리스',type:'mc',
+   q:'기원전 508년 부족 개편으로 아테네 민주정치의 기틀을 세운 인물은?',
+   choices:['클레이스테네스','솔론','페리클레스','아리스토텔레스'],answer:0,
+   ex:'클레이스테네스는 혈연 중심의 4부족을 지역 중심 10부족으로 바꿔 평민의 참여를 넓혔어요. 솔론은 그보다 앞서 채무 노예제를 없앤 개혁을, 페리클레스는 뒤에 민주정치의 전성기를 이끌었습니다.'},
+
+  {id:'w04',cat:'world',tag:'고대 그리스',type:'mc',
+   q:'알렉산드로스 대왕의 동방 원정으로 그리스와 오리엔트 문화가 융합된 문화는?',
+   choices:['헬레니즘','르네상스','비잔티움','헤브라이즘'],answer:0,
+   ex:'알렉산드로스는 기원전 334년부터 10여 년간 페르시아와 이집트, 인도 서북부까지 진군했어요. 그의 사후 문화가 뒤섞이며 알렉산드리아를 중심으로 헬레니즘 문화가 꽃피었습니다.'},
+
+  {id:'w05',cat:'world',tag:'고대 로마',type:'mc',
+   q:'로마 제국에서 기독교를 공인한 313년의 칙령은?',
+   choices:['밀라노 칙령','니케아 신조','테오도시우스 칙령','마그나 카르타'],answer:0,
+   ex:'콘스탄티누스 황제는 313년 밀라노 칙령으로 기독교 신앙의 자유를 허용했어요. 이후 392년 테오도시우스 황제가 기독교를 국교로 삼았습니다.'},
+
+  {id:'w06',cat:'world',tag:'중세 유럽',type:'mc',
+   q:'1215년 영국 귀족들이 왕권을 제한하며 만든 문서는?',
+   choices:['마그나 카르타','권리장전','인권선언','독립선언서'],answer:0,
+   ex:'존 왕은 전쟁 비용을 대려다 귀족들의 반발을 샀고, 결국 과세에는 귀족의 동의를 받으라는 마그나 카르타에 서명했어요. 오늘날 헌법 정신의 뿌리로 평가받습니다.'},
+
+  {id:'w07',cat:'world',tag:'르네상스',type:'mc',
+   q:'르네상스 예술가들을 후원한 피렌체의 명문가는?',
+   choices:['메디치 가문','합스부르크 가문','부르봉 가문','튜더 가문'],answer:0,
+   ex:'메디치 가문은 로렌초를 중심으로 레오나르도 다 빈치와 미켈란젤로를 후원했어요. 은행업으로 모은 막대한 부가 피렌체를 르네상스의 중심지로 만들었습니다.'},
+
+  {id:'w08',cat:'world',tag:'르네상스',type:'mc',
+   q:'금속 활판 인쇄로 성서를 찍어 지식 확산을 이끈 인물은?',
+   choices:['구텐베르크','코페르니쿠스','에라스무스','콜럼버스'],answer:0,
+   ex:'구텐베르크는 1455년 활자로 42행 성서를 찍어냈어요. 책값이 크게 떨어지자 종교개혁 사상이 유럽 전역으로 빠르게 퍼지는 통로가 열렸습니다.'},
+
+  {id:'w09',cat:'world',tag:'대항해시대',type:'ox',
+   q:'콜럼버스는 1492년 인도에 도착했다.',
+   choices:['O','X'],answer:1,
+   ex:'콜럼버스는 인도로 가려다 아메리카 대륙의 카리브해 섬들에 닿았어요. 본인은 끝까지 인도라고 믿어 원주민을 "인디언"이라 불렀고, 그래서 지금은 아메리카 원주민으로 부릅니다.'},
+
+  {id:'w10',cat:'world',tag:'종교개혁',type:'mc',
+   q:'1517년 면죄부 판매를 비판하며 종교개혁을 시작한 인물은?',
+   choices:['마르틴 루터','장 칼뱅','에라스무스','헨리 8세'],answer:0,
+   ex:'루터는 비텐베르크 성 교회 문에 95개조 반박문을 붙여 면죄부 판매를 문제 삼았어요. 그의 글이 인쇄술을 타고 퍼지며 유럽은 가톨릭과 개신교로 갈라졌습니다.'},
+
+  {id:'w11',cat:'world',tag:'산업혁명',type:'mc',
+   q:'뉴커먼의 증기기관을 개량해 산업혁명을 앞당긴 인물은?',
+   choices:['제임스 와트','조지 스티븐슨','토머스 에디슨','리처드 아크라이트'],answer:0,
+   ex:'와트는 1769년 별도의 응축기를 붙인 증기기관을 특허 냈고, 열효율이 크게 올라가며 공장과 기차의 동력이 됐어요. 스티븐슨은 이 증기기관을 얹은 기관차를 만들었습니다.'},
+
+  {id:'w12',cat:'world',tag:'프랑스 혁명',type:'mc',
+   q:'프랑스 혁명이 시작된 1789년 7월 14일의 사건은?',
+   choices:['바스티유 감옥 습격','나폴레옹 즉위','인권선언 발표','베르사유 궁전 점령'],answer:0,
+   ex:'시민들은 왕권의 상징이자 무기고였던 바스티유 감옥을 공격해 무너뜨렸어요. 두 달 뒤 《인간과 시민의 권리 선언》이 발표되며 특권의 시대가 흔들렸습니다.'},
+
+  {id:'w13',cat:'world',tag:'나폴레옹',type:'mc',
+   q:'나폴레옹이 최후의 패배를 맞은 1815년 전투는?',
+   choices:['워털루 전투','트라팔가 해전','아우스터리츠 전투','라이프치히 전투'],answer:0,
+   ex:'엘바섬에서 탈출해 백일천하를 이어가던 나폴레옹은 1815년 워털루에서 무너졌어요. 그 뒤 세인트헬레나섬에 유배돼 생을 마쳤습니다.'},
+
+  {id:'w14',cat:'world',tag:'근대 유럽',type:'mc',
+   q:'1776년 7월 4일 발표된, "모든 인간은 평등하게 창조되었다"로 시작하는 문서는?',
+   choices:['미국 독립선언서','프랑스 인권선언','영국 권리장전','버지니아 권리장전'],answer:0,
+   ex:'토머스 제퍼슨이 초안을 쓴 미국 독립선언서는 영국으로부터의 독립을 선포했어요. 7월 4일은 지금도 미국의 독립기념일입니다.'},
+
+  {id:'w15',cat:'world',tag:'근대 유럽',type:'mc',
+   q:'제1차 세계대전의 도화선이 된 1914년 사건은?',
+   choices:['사라예보 사건','뮌헨 협정','베르사유 조약','마른 전투'],answer:0,
+   ex:'1914년 6월 사라예보에서 오스트리아 황태자 부부가 세르비아 청년에게 암살됐어요. 동맹 체제가 줄줄이 얽히며 한 달 만에 유럽 전체가 전쟁에 휘말렸습니다.'},
+
+  {id:'w16',cat:'world',tag:'근대 유럽',type:'mc',
+   q:'제1차 세계대전 뒤 독일에 막대한 배상금을 지운 조약은?',
+   choices:['베르사유 조약','라팔로 조약','브레스트-리토프스크 조약','파리 조약'],answer:0,
+   ex:'1919년 베르사유 조약은 독일에 전쟁 책임을 지우고 영토와 배상금을 요구했어요. 이 굴욕이 독일 사회의 불만을 키워 제2차 세계대전의 씨앗이 됐다는 평가를 받습니다.'},
+
+  {id:'w17',cat:'world',tag:'현대',type:'ox',
+   q:'제2차 세계대전은 1945년에 끝났다.',
+   choices:['O','X'],answer:0,
+   ex:'독일은 1945년 5월 항복했고, 일본은 히로시마·나가사키 원자폭탄 이후 8월 15일 무조건 항복을 선언했어요. 공식 항복 문서 서명은 9월 2일 미주리함 위에서 이뤄졌습니다.'},
+
+  {id:'w18',cat:'world',tag:'고대 로마',type:'mc',
+   q:'서로마 제국이 멸망한 해는?',
+   choices:['395년','476년','1453년','1204년'],answer:1,
+   ex:'476년 게르만 용병 오도아케르가 서로마 마지막 황제를 폐위하며 서로마가 무너졌어요. 동로마(비잔티움)는 그보다 훨씬 뒤인 1453년 오스만 제국에 의해 멸망했습니다.'},
+
+  {id:'w19',cat:'world',tag:'중세 유럽',type:'mc',
+   q:'1096년 교황 우르바누스 2세의 호소로 시작된 전쟁은?',
+   choices:['십자군 전쟁','백년 전쟁','장미 전쟁','30년 전쟁'],answer:0,
+   ex:'십자군 전쟁은 성지 예루살렘을 되찾겠다며 200여 년간 이어진 종교 전쟁이에요. 실패로 끝났지만 동방의 물자와 문화가 유입되며 르네상스의 토대가 됐습니다.'},
+
+  {id:'w20',cat:'world',tag:'비잔티움',type:'mc',
+   q:'비잔티움의 유스티니아누스 황제가 콘스탄티노플에 세운 대성당은?',
+   choices:['성소피아 대성당','노트르담 대성당','성 베드로 대성당','산타 마리아 마조레'],answer:0,
+   ex:'성소피아 대성당은 537년 완성됐고, 거대한 돔이 당대 건축의 정점을 보여줬어요. 오스만 제국이 콘스탄티노플을 점령한 뒤에는 모스크로 바뀌었습니다.'},
+
+  {id:'w21',cat:'world',tag:'아메리카 문명',type:'mc',
+   q:'아즈텍 문명의 수도 이름은?',
+   choices:['테노치티틀란','쿠스코','치첸이트사','마추픽추'],answer:0,
+   ex:'테노치티틀란은 호수 위 섬에 세워진 아즈텍의 수도로, 현재 멕시코시티 자리예요. 1521년 코르테스의 정복으로 무너졌고, 쿠스코와 마추픽추는 잉카 문명의 유적입니다.'},
+
+  {id:'w22',cat:'world',tag:'고대 인도',type:'mc',
+   q:'인더스 강 유역에서 발굴된 고대 도시 유적은?',
+   choices:['모헨조다로','우르','니네베','트로이'],answer:0,
+   ex:'모헨조다로는 1920년대 발굴된 인더스 문명의 도시로, 격자형 거리와 배수 시설이 정교하기로 유명해요. 우르와 니네베는 메소포타미아, 트로이는 지중해 유적입니다.'},
+
+  {id:'w23',cat:'world',tag:'냉전',type:'mc',
+   q:'1962년 미국과 소련이 핵전쟁 직전까지 몰린 사건은?',
+   choices:['쿠바 미사일 위기','베를린 봉쇄','한국전쟁','베트남 전쟁'],answer:0,
+   ex:'소련이 쿠바에 핵미사일을 배치하자 케네디가 해상 봉쇄로 맞섰어요. 13일간의 대치 끝에 미사일이 철수했고, 이후 양국은 직통 전화(핫라인)를 설치했습니다.'},
+
+  {id:'w24',cat:'world',tag:'냉전',type:'mc',
+   q:'냉전 종식의 상징으로 1989년 무너진 것은?',
+   choices:['베를린 장벽','만리장성','마지노선','철의 장막'],answer:0,
+   ex:'1989년 11월 9일 베를린 장벽이 무너지며 동서 분단의 상징이 사라졌어요. 이듬해 독일이 통일됐고, 1991년 소련 해체로 냉전이 막을 내렸습니다.'},
+
+  /* ---------------- 교양 상식 ---------------- */
+  {id:'g01',cat:'general',tag:'과학',type:'mc',
+   q:'1953년 DNA의 이중나선 구조를 밝힌 두 과학자는?',
+   choices:['왓슨과 크릭','퀴리 부부','뉴턴과 라플라스','다윈과 멘델'],answer:0,
+   ex:'왓슨과 크릭은 로절린드 프랭클린의 X선 회절 사진을 단서로 DNA 이중나선 모형을 완성했어요. 이 공로로 1962년 노벨상을 받았습니다.'},
+
+  {id:'g02',cat:'general',tag:'과학',type:'mc',
+   q:'1905년 특수 상대성이론을 발표한 과학자는?',
+   choices:['알베르트 아인슈타인','아이작 뉴턴','닐스 보어','갈릴레오 갈릴레이'],answer:0,
+   ex:'아인슈타인은 1905년 한 해에 특수 상대성이론과 광전효과 논문 등을 발표해 "기적의 해"를 만들었어요. 이때 나온 식이 유명한 E=mc²입니다.'},
+
+  {id:'g03',cat:'general',tag:'미술',type:'mc',
+   q:'《모나리자》를 그린 화가는?',
+   choices:['레오나르도 다 빈치','미켈란젤로','라파엘로','보티첼리'],answer:0,
+   ex:'레오나르도 다 빈치는 1503년경 《모나리자》를 그리기 시작했어요. 흐릿하게 경계를 풀어내는 스푸마토 기법으로 신비로운 미소를 만들었고, 이 작품은 지금 프랑스 루브르 박물관에 있습니다.'},
+
+  {id:'g04',cat:'general',tag:'음악',type:'mc',
+   q:'《환희의 송가》가 합창으로 등장하는 베토벤의 교향곡은?',
+   choices:['교향곡 9번','교향곡 5번','교향곡 6번','교향곡 3번'],answer:0,
+   ex:'베토벤은 청력을 거의 잃은 상태에서 1824년 교향곡 9번을 초연했어요. 마지막 악장에 실러의 시를 합창으로 얹었고, 이 선율은 지금 유럽연합의 상징가로 쓰입니다.'},
+
+  {id:'g05',cat:'general',tag:'문학',type:'mc',
+   q:'지옥·연옥·천국을 여행하는 서사시 《신곡》을 쓴 작가는?',
+   choices:['단테','괴테','셰익스피어','세르반테스'],answer:0,
+   ex:'단테는 14세기에 《신곡》을 써서 사랑하는 베아트리체를 천국의 안내자로 등장시켰어요. 라틴어 대신 이탈리아어로 쓴 이 작품은 근대 유럽 문학의 출발점으로 꼽힙니다.'},
+
+  {id:'g06',cat:'general',tag:'경제',type:'mc',
+   q:'"보이지 않는 손"이라는 말로 시장의 조화를 설명한 《국부론》의 저자는?',
+   choices:['애덤 스미스','존 메이너드 케인스','카를 마르크스','데이비드 리카도'],answer:0,
+   ex:'애덤 스미스는 1776년 《국부론》에서 분업과 자유로운 시장이 국가의 부를 키운다고 주장했어요. 각자가 이익을 좇으면 결과적으로 사회 전체에 이롭다는 논리였습니다.'},
+
+  {id:'g07',cat:'general',tag:'과학',type:'ox',
+   q:'빛은 1초에 지구를 약 7바퀴 반 돈다.',
+   choices:['O','X'],answer:0,
+   ex:'진공에서 빛의 속도는 초속 약 30만 km예요. 지구 둘레가 약 4만 km이니 1초에 7바퀴 반을 도는 셈이고, 지구에서 달까지 1.3초면 도착합니다.'},
+
+  {id:'g08',cat:'general',tag:'과학',type:'ox',
+   q:'태양계에서 가장 큰 행성은 토성이다.',
+   choices:['O','X'],answer:1,
+   ex:'가장 큰 행성은 목성이에요. 지름이 약 14만 km로 지구의 11배이고, 부피로는 지구가 1,300개 넘게 들어갑니다. 토성은 두 번째로 큰 행성입니다.'},
+
+  {id:'g09',cat:'general',tag:'과학',type:'mc',
+   q:'1969년 인류 최초로 달에 착륙한 우주선은?',
+   choices:['아폴로 11호','보스토크 1호','스푸트니크 1호','아폴로 13호'],answer:0,
+   ex:'아폴로 11호의 닐 암스트롱이 1969년 7월 20일 달 표면에 첫 발을 디뎠어요. "한 인간에게는 작은 발걸음, 인류에게는 위대한 도약"이라는 말을 남겼습니다.'},
+
+  {id:'g10',cat:'general',tag:'의학',type:'mc',
+   q:'1928년 푸른곰팡이에서 페니실린을 발견한 과학자는?',
+   choices:['알렉산더 플레밍','루이 파스퇴르','로베르트 코흐','에드워드 제너'],answer:0,
+   ex:'플레밍은 세균 배양접시가 곰팡이에 오염된 것을 보고 그 주변에 세균이 자라지 못한다는 걸 발견했어요. 페니실린은 제2차 세계대전 부상자의 목숨을 구하며 항생제 시대를 열었습니다.'},
+
+  {id:'g11',cat:'general',tag:'의학',type:'mc',
+   q:'1796년 우두법으로 천연두 예방법을 개발한 의사는?',
+   choices:['에드워드 제너','루이 파스퇴르','알렉산더 플레밍','로베르트 코흐'],answer:0,
+   ex:'제너는 우유를 짜는 여성들이 소의 우두를 앓고 나면 천연두에 걸리지 않는다는 것에 착안했어요. 이 방법이 퍼지며 천연두는 1980년 세계에서 완전히 박멸된 유일한 감염병이 됐습니다.'},
+
+  {id:'g12',cat:'general',tag:'과학',type:'mc',
+   q:'지구가 태양 주위를 돈다는 지동설을 주장한 천문학자는?',
+   choices:['코페르니쿠스','프톨레마이오스','케플러','허블'],answer:0,
+   ex:'코페르니쿠스는 1543년 《천구의 회전에 관하여》에서 지동설을 펼쳤어요. 갈릴레오가 망원경으로 목성의 위성을 관측하며 이를 뒷받침했고, 프톨레마이오스는 반대로 지구 중심설을 주장했습니다.'},
+
+  {id:'g13',cat:'general',tag:'과학',type:'mc',
+   q:'자연선택에 의한 진화론을 제시한 다윈의 책은?',
+   choices:['《종의 기원》','《우주》','《유토피아》','《국부론》'],answer:0,
+   ex:'다윈은 1859년 《종의 기원》에서 환경에 유리한 개체가 살아남아 종이 변한다고 설명했어요. 갈라파고스 섬의 핀치 새 관찰이 단서가 됐고, 훗날 유전학과 결합해 현대 진화론이 됩니다.'},
+
+  {id:'g14',cat:'general',tag:'철학·심리',type:'mc',
+   q:'무의식과 꿈의 해석으로 정신분석학을 세운 인물은?',
+   choices:['지그문트 프로이트','카를 융','장 피아제','이반 파블로프'],answer:0,
+   ex:'프로이트는 1900년 《꿈의 해석》에서 꿈이 무의식의 욕망을 드러낸다고 주장했어요. 인간의 마음을 원초아·자아·초자아로 나눈 설명으로 20세기 사상에 큰 영향을 남겼습니다.'},
+
+  {id:'g15',cat:'general',tag:'문학',type:'mc',
+   q:'"사느냐, 죽느냐" 독백이 나오는 셰익스피어의 비극은?',
+   choices:['《햄릿》','《맥베스》','《오셀로》','《리어왕》'],answer:0,
+   ex:'《햄릿》은 1600년경 쓰인 덴마크 왕자의 복수 비극이에요. 셰익스피어의 4대 비극 가운데 가장 길고 자주 공연되는 작품으로 꼽힙니다.'},
+
+  {id:'g16',cat:'general',tag:'미술',type:'mc',
+   q:'1937년 스페인 내전의 참상을 그린 피카소의 작품은?',
+   choices:['《게르니카》','《아비뇽의 처녀들》','《수련》','《별이 빛나는 밤》'],answer:0,
+   ex:'나치의 지원을 받은 독일군이 바스크 지방의 도시 게르니카를 폭격하자, 피카소는 3.5m 높이의 대작에 그 참상을 담았어요. 큐비즘의 대표작이자 반전 미술의 상징으로 남았습니다.'},
+
+  {id:'g17',cat:'general',tag:'미술',type:'mc',
+   q:'고흐가 생레미 요양원에서 소용돌이치는 밤하늘을 그린 작품은?',
+   choices:['《별이 빛나는 밤》','《해바라기》','《수련》','《진주 귀걸이를 한 소녀》'],answer:0,
+   ex:'고흐는 1889년 생레미의 요양원 창밖 풍경을 상상으로 더해 《별이 빛나는 밤》을 그렸어요. 생전에 그림을 거의 팔지 못했던 그의 작품은 지금 뉴욕 현대미술관에 있습니다.'},
+
+  {id:'g18',cat:'general',tag:'음악',type:'mc',
+   q:'오케스트라가 연주 전 조율할 때 기준음으로 삼는 악기는?',
+   choices:['오보에','바이올린','피아노','첼로'],answer:0,
+   ex:'오보에는 음정이 안정적이고 음이 뚜렷해 오케스트라 전체가 이 악기의 A음에 맞춰 조율해요. 바이올린이나 피아노는 조율이 흔들리거나 소리가 길게 남아 기준음으로 쓰기 어렵습니다.'},
+
+  {id:'g19',cat:'general',tag:'과학',type:'mc',
+   q:'빛의 삼원색은?',
+   choices:['빨강·초록·파랑','빨강·노랑·파랑','청록·자홍·노랑','검정·흰색·회색'],answer:0,
+   ex:'모니터와 조명은 빨강·초록·파랑(RGB)을 섞어 모든 색을 만들어요. 물감이나 인쇄는 청록·자홍·노랑(CMYK)을 쓰는데, 이는 색을 더하는 빛과 달리 색을 빼는 방식이기 때문입니다.'},
+
+  {id:'g20',cat:'general',tag:'지리',type:'ox',
+   q:'세계에서 국토 면적이 가장 넓은 나라는 러시아다.',
+   choices:['O','X'],answer:0,
+   ex:'러시아는 약 1,710만 km²로 캐나다(약 998만 km²)와 중국을 앞서요. 11개 시간대에 걸쳐 있고, 전체 국토의 절반 이상이 영구 동토 지역입니다.'},
+
+  {id:'g21',cat:'general',tag:'국제',type:'mc',
+   q:'1945년 설립된 국제연합(UN)의 본부가 있는 도시는?',
+   choices:['뉴욕','제네바','파리','브뤼셀'],answer:0,
+   ex:'UN 본부는 미국 뉴욕 맨해튼에 있어요. 제네바에는 유럽 사무소와 세계보건기구(WHO) 등 많은 국제기구가 모여 있습니다.'},
+
+  {id:'g22',cat:'general',tag:'스포츠',type:'mc',
+   q:'근대 올림픽이 처음 열린 1896년 대회 개최 도시는?',
+   choices:['아테네','파리','런던','로마'],answer:0,
+   ex:'쿠베르탱의 제안으로 1896년 아테네에서 제1회 근대 올림픽이 열렸어요. 고대 올림픽의 발상지에서 열린 이 대회에 14개국 선수가 참가했습니다.'},
+
+  {id:'g23',cat:'general',tag:'과학',type:'mc',
+   q:'만유인력 법칙을 담은 《프린키피아》를 쓴 과학자는?',
+   choices:['아이작 뉴턴','갈릴레오 갈릴레이','요하네스 케플러','르네 데카르트'],answer:0,
+   ex:'뉴턴은 1687년 《프린키피아》에서 사과가 떨어지는 힘과 행성이 도는 힘이 같다고 밝혔어요. 이 법칙으로 천체 운동을 수학적으로 설명하며 근대 물리학의 문을 열었습니다.'},
+
+  {id:'g24',cat:'general',tag:'과학',type:'mc',
+   q:'1869년 원소를 원자량 순으로 배열해 주기율표를 만든 화학자는?',
+   choices:['멘델레예프','존 돌턴','라부아지에','마리 퀴리'],answer:0,
+   ex:'멘델레예프는 원소를 늘어놓다가 아직 발견되지 않은 원소의 자리를 비워두고 성질까지 예측했어요. 훗날 갈륨과 게르마늄이 발견되며 그의 표가 옳았음이 증명됐습니다.'}
+];
+
+
+/* =========================================================
+   역사 한 입 — 게임 로직
+   ========================================================= */
+(function(){
+'use strict';
+
+/* ---------- util ---------- */
+const $ = (id)=>document.getElementById(id);
+const NUM = ['①','②','③','④'];
+const KEY = 'history-bite-v1';
+
+function pad2(n){return n<10?'0'+n:''+n;}
+function dateKey(d){return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());}
+function todayKey(){return dateKey(new Date());}
+function yesterdayKey(){const d=new Date();d.setDate(d.getDate()-1);return dateKey(d);}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function shuffle(arr,rng){
+  const a=arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const r=rng?rng():Math.random();
+    const j=Math.floor(r*(i+1));
+    const t=a[i];a[i]=a[j];a[j]=t;
+  }
+  return a;
+}
+function seeded(seed){
+  let t=seed>>>0;
+  return function(){
+    t+=0x6D2B79F5;
+    let r=Math.imul(t^(t>>>15),1|t);
+    r^=r+Math.imul(r^(r>>>7),61|r);
+    return ((r^(r>>>14))>>>0)/4294967296;
+  };
+}
+function hashStr(s){
+  let h=2166136261;
+  for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}
+  return h>>>0;
+}
+
+/* ---------- storage ---------- */
+const DEFAULT = {
+  v:1,
+  best:{daily:0,korean:0,world:0,general:0,survival:0,review:0},
+  total:{answered:0,correct:0},
+  catStats:{korean:{a:0,c:0},world:{a:0,c:0},general:{a:0,c:0}},
+  catPerfect:{korean:false,world:false,general:false},
+  maxCombo:0,
+  perfectRounds:0,
+  survBest:0,
+  rounds:0,
+  reviewCorrect:0,
+  streak:{last:null,count:0,best:0},
+  wrong:{},
+  seen:{},
+  ach:{},
+  title:'',
+  sound:true,
+  vibrate:true,
+  dailyDate:null,
+  dailyScore:0
+};
+
+function loadData(){
+  const d=JSON.parse(JSON.stringify(DEFAULT));
+  let raw=null;
+  try{ raw=JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){ raw=null; }
+  if(raw&&typeof raw==='object'){
+    Object.keys(raw).forEach(function(k){
+      const v=raw[k];
+      if(v&&typeof v==='object'&&!Array.isArray(v)&&d[k]&&typeof d[k]==='object'&&!Array.isArray(d[k])){
+        Object.assign(d[k],v);
+      }else{
+        d[k]=v;
+      }
+    });
+  }
+  if(!d.catStats.korean) d.catStats.korean={a:0,c:0};
+  if(!d.catStats.world) d.catStats.world={a:0,c:0};
+  if(!d.catStats.general) d.catStats.general={a:0,c:0};
+  return d;
+}
+let DATA = loadData();
+function save(){
+  try{ localStorage.setItem(KEY,JSON.stringify(DATA)); }catch(e){}
+}
+
+/* ---------- achievements / titles ---------- */
+const ACHS = [
+  {id:'first',   icon:'👣', name:'첫 발걸음',      desc:'첫 라운드를 끝냈어요',            title:'역사 입문자',        test:function(d){return d.rounds>=1;}},
+  {id:'combo5',  icon:'🔥', name:'콤보 새싹',      desc:'5콤보를 달성했어요',              title:'',                  test:function(d){return d.maxCombo>=5;}},
+  {id:'combo10', icon:'⚡', name:'10콤보',         desc:'10문제 연속 정답',               title:'콤보 장인',          test:function(d){return d.maxCombo>=10;}},
+  {id:'perfect', icon:'🏆', name:'완벽한 라운드',  desc:'한 라운드 10문제 만점',           title:'만점 사냥꾼',        test:function(d){return d.perfectRounds>=1;}},
+  {id:'korean',  icon:'🏯', name:'조선왕조 마스터', desc:'한국사 라운드 만점',             title:'조선왕조 마스터',    test:function(d){return !!d.catPerfect.korean;}},
+  {id:'world',   icon:'🌍', name:'세계사 탐험가',  desc:'세계사 라운드 만점',              title:'세계사 탐험가',      test:function(d){return !!d.catPerfect.world;}},
+  {id:'general', icon:'💡', name:'잡학박사',       desc:'교양 라운드 만점',                title:'잡학박사',          test:function(d){return !!d.catPerfect.general;}},
+  {id:'surv10',  icon:'💗', name:'생존 본능',      desc:'서바이벌 10문제 돌파',            title:'불꽃의 생존자',      test:function(d){return d.survBest>=10;}},
+  {id:'surv20',  icon:'👑', name:'서바이벌의 왕',  desc:'서바이벌 20문제 돌파',            title:'서바이벌의 왕',      test:function(d){return d.survBest>=20;}},
+  {id:'days3',   icon:'📅', name:'3일 연속',       desc:'3일 연속으로 플레이했어요',        title:'성실한 탐구자',      test:function(d){return d.streak.best>=3;}},
+  {id:'solve50', icon:'📚', name:'걸어다니는 백과', desc:'누적 50문제를 풀었어요',           title:'걸어다니는 백과사전', test:function(d){return d.total.answered>=50;}},
+  {id:'review10',icon:'🧽', name:'복습의 달인',    desc:'오답 문제를 10번 바로잡았어요',     title:'오답 청소부',        test:function(d){return d.reviewCorrect>=10;}}
+];
+
+function checkAch(notify){
+  const out=[];
+  ACHS.forEach(function(a){
+    if(!DATA.ach[a.id]&&a.test(DATA)){ DATA.ach[a.id]=Date.now(); out.push(a); }
+  });
+  if(out.length){
+    save();
+    if(notify!==false){
+      out.forEach(function(a,k){
+        setTimeout(function(){ showToast(a.icon,a.name+' 달성!',a.desc); }, k*1500);
+      });
+    }
+  }
+  return out;
+}
+
+/* ---------- sound ---------- */
+let AC=null;
+function ac(){
+  if(AC) return AC;
+  try{
+    const Ctx=window.AudioContext||window.webkitAudioContext;
+    if(!Ctx) return null;
+    AC=new Ctx();
+  }catch(e){ AC=null; }
+  return AC;
+}
+function tone(freq,delay,dur,type,vol){
+  const c=ac(); if(!c) return;
+  try{
+    if(c.state==='suspended') c.resume();
+    const t=c.currentTime+delay;
+    const o=c.createOscillator();
+    const g=c.createGain();
+    o.type=type||'sine';
+    o.frequency.setValueAtTime(freq,t);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(vol||0.06,t+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(g);g.connect(c.destination);
+    o.start(t);o.stop(t+dur+0.02);
+  }catch(e){}
+}
+function sfx(kind){
+  if(!DATA.sound) return;
+  if(kind==='ok'){ tone(680,0,.10,'sine',.055); tone(1020,.075,.16,'sine',.05); }
+  else if(kind==='no'){ tone(220,0,.14,'triangle',.06); tone(160,.11,.20,'triangle',.055); }
+  else if(kind==='combo'){ tone(880,0,.08,'sine',.045); tone(1180,.07,.09,'sine',.04); tone(1480,.14,.12,'sine',.035); }
+  else if(kind==='end'){ tone(523,0,.12,'sine',.05); tone(659,.11,.12,'sine',.05); tone(784,.22,.22,'sine',.055); }
+  else if(kind==='tap'){ tone(560,0,.035,'sine',.025); }
+  else if(kind==='badge'){ tone(1046,0,.09,'sine',.04); tone(1318,.09,.14,'sine',.04); }
+}
+function buzz(ms){
+  if(!DATA.vibrate) return;
+  try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){}
+}
+
+/* ---------- ui helpers ---------- */
+let SCREEN='home';
+let SEG='wrong';
+let G=null;
+let LAST={mode:'daily',cat:null};
+let modalResolve=null;
+
+function showScreen(name){
+  SCREEN=name;
+  ['home','quiz','result','collection','settings'].forEach(function(s){
+    $('screen-'+s).classList.toggle('active',s===name);
+  });
+  const tab=$('tabbar');
+  tab.classList.toggle('hide',name==='quiz'||name==='result');
+  document.querySelectorAll('.tab').forEach(function(b){
+    b.classList.toggle('on',b.dataset.tab===name);
+  });
+  window.scrollTo(0,0);
+  try{ $('screen-'+name).scrollTop=0; }catch(e){}
+}
+function scrollTop(){ const w=$('q-wrap'); if(w) w.scrollTop=0; window.scrollTo(0,0); }
+
+function showToast(icon,title,desc){
+  const t=$('toast');
+  t.querySelector('.ti').textContent=icon;
+  $('toast-title').textContent=title;
+  $('toast-desc').textContent=desc;
+  t.classList.add('show');
+  sfx('badge');
+  if(showToast._t) clearTimeout(showToast._t);
+  showToast._t=setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+
+function confirmModal(opt){
+  return new Promise(function(resolve){
+    const bg=$('modal-bg');
+    $('modal').innerHTML =
+      '<h3>'+esc(opt.title)+'</h3>'+
+      '<p>'+esc(opt.desc)+'</p>'+
+      '<div class="row">'+
+        '<button class="cancel" data-m="0">'+esc(opt.cancel||'취소')+'</button>'+
+        '<button class="ok'+(opt.danger?' red':'')+'" data-m="1">'+esc(opt.ok||'확인')+'</button>'+
+      '</div>';
+    bg.classList.add('show');
+    modalResolve=resolve;
+  });
+}
+document.addEventListener('click',function(e){
+  const b=e.target.closest('[data-m]');
+  if(!b) return;
+  $('modal-bg').classList.remove('show');
+  const r=modalResolve; modalResolve=null;
+  if(r) r(b.dataset.m==='1');
+});
+
+function greeting(){
+  const h=new Date().getHours();
+  if(h<5) return '정우 님, 늦은 밤에도 탐구 중이시네요';
+  if(h<11) return '정우 님, 좋은 아침이에요';
+  if(h<17) return '정우 님, 오늘도 한 입 어떠세요?';
+  if(h<22) return '정우 님, 저녁에 머리 식히기 좋아요';
+  return '정우 님, 오늘 하루 마무리 퀴즈?';
+}
+
+/* ---------- home ---------- */
+function renderHome(){
+  const d=DATA;
+  const sb=$('btn-sound-home');
+  if(sb) sb.textContent=d.sound?'🔊':'🔇';
+  const hello=$('hello'); if(hello) hello.textContent=greeting();
+
+  const badge=$('title-badge');
+  if(d.title){
+    badge.className='title-badge';
+    badge.innerHTML='<span>🎖️</span> '+esc(d.title);
+  }else{
+    badge.className='title-badge empty';
+    badge.innerHTML='🎖️ 아직 칭호가 없어요';
+  }
+
+  const doneToday = d.dailyDate===todayKey();
+  const streakOn = (d.streak.last===todayKey()||d.streak.last===yesterdayKey());
+  const streakCount = streakOn?d.streak.count:0;
+  const solved = Object.keys(d.seen).length;
+  const acc = d.total.answered? Math.round(d.total.correct/d.total.answered*100):0;
+  const bestAll = Math.max(d.best.daily,d.best.korean,d.best.world,d.best.general,d.best.survival,d.best.review);
+  const wrongN = Object.keys(d.wrong).length;
+  const streakTxt = streakCount>0 ? ('<b>'+streakCount+'일</b> 연속 탐구 중') : '오늘부터 연속 기록 시작!';
+
+  let cats='';
+  ['korean','world','general'].forEach(function(k){
+    const c=CATS[k];
+    const st=d.catStats[k];
+    const rate = st.a? Math.round(st.c/st.a*100):0;
+    cats+='<button class="cat '+c.cls+'" data-act="start" data-mode="category" data-cat="'+k+'">'+
+      '<span class="ring">'+rate+'%</span>'+
+      '<span class="ico">'+c.icon+'</span>'+
+      '<span class="nm">'+c.name+'</span>'+
+      '<span class="bs">'+(d.best[k]?'최고 '+d.best[k]+'점':'첫 도전 해보기')+'</span>'+
+      '</button>';
+  });
+
+  $('home-body').innerHTML =
+    '<div class="streak">'+
+      '<span class="flame">🔥</span>'+
+      '<span class="txt">'+streakTxt+'</span>'+
+      '<span class="best">최장 '+d.streak.best+'일</span>'+
+    '</div>'+
+
+    '<div class="section-label"><h2>오늘의 도전</h2><span class="hint">'+
+      (doneToday?'오늘 완료':'3카테고리 10문제')+'</span></div>'+
+
+    '<div class="daily">'+
+      '<span class="tag">DAILY · '+(doneToday?'완료':'NEW')+'</span>'+
+      '<h3>'+(doneToday?'오늘의 도전 완료!':'오늘의 10문제')+'</h3>'+
+      '<p>'+(doneToday
+        ? '오늘 최고 '+d.dailyScore+'점을 기록했어요. 한 번 더 풀어 감을 잡아도 좋아요.'
+        : '한국사 4 · 세계사 3 · 교양 3문제. 매일 자정에 새로 열려요.')+'</p>'+
+      '<div class="foot">'+
+        '<button class="btn-primary" data-act="start" data-mode="daily">'+
+          (doneToday?'한 번 더 도전':'도전 시작')+' <span>→</span></button>'+
+      '</div>'+
+    '</div>'+
+
+    '<div class="section-label"><h2>카테고리 집중</h2><span class="hint">10문제</span></div>'+
+    '<div class="cats">'+cats+'</div>'+
+
+    '<div class="section-label"><h2>무한 도전</h2><span class="hint">하트 3개 · 15초</span></div>'+
+    '<button class="surv" data-act="start" data-mode="survival">'+
+      '<span class="ico">❤️‍🔥</span>'+
+      '<span class="t"><b>서바이벌 모드</b><span>틀리면 하트 -1 · 최고 '+d.survBest+'문제 생존</span></span>'+
+      '<span class="go">▶</span>'+
+    '</button>'+
+
+    (wrongN?
+    '<button class="surv" style="border-color:rgba(255,206,92,.28);background:linear-gradient(120deg,rgba(255,206,92,.12),rgba(255,206,92,.02) 60%),var(--card2)" data-act="start" data-mode="review">'+
+      '<span class="ico">📝</span>'+
+      '<span class="t"><b>오답 복습</b><span>틀린 문제 '+wrongN+'개를 다시 풀어보기</span></span>'+
+      '<span class="go" style="color:var(--gold);border-color:rgba(255,206,92,.35);background:rgba(255,206,92,.12)">▶</span>'+
+    '</button>':'' )+
+
+    '<div class="stats">'+
+      '<div class="stat"><b>'+acc+'%</b><span>누적 정답률</span></div>'+
+      '<div class="stat"><b>'+bestAll+'</b><span>최고 점수</span></div>'+
+      '<div class="stat"><b>'+solved+'<span style="font-size:11px;color:var(--dim2)">/72</span></b><span>만난 문제</span></div>'+
+    '</div>'+
+
+    '<div style="height:6px"></div>';
+}
+
+/* ---------- game ---------- */
+function buildRound(mode,cat){
+  if(mode==='daily'){
+    const rng=seeded(hashStr('hb-daily-'+todayKey()));
+    const pick=function(c,n){ return shuffle(QUESTIONS.filter(function(q){return q.cat===c;}),rng).slice(0,n); };
+    let list=pick('korean',4).concat(pick('world',3)).concat(pick('general',3));
+    return shuffle(list,rng);
+  }
+  if(mode==='category'){
+    return shuffle(QUESTIONS.filter(function(q){return q.cat===cat;})).slice(0,10);
+  }
+  if(mode==='review'){
+    const ids=Object.keys(DATA.wrong).sort(function(a,b){return (DATA.wrong[b].at||0)-(DATA.wrong[a].at||0);}).slice(0,10);
+    const qs=ids.map(function(id){ return QUESTIONS.find(function(q){return q.id===id;}); }).filter(Boolean);
+    return shuffle(qs);
+  }
+  return shuffle(QUESTIONS);
+}
+
+function start(mode,cat){
+  let qs=buildRound(mode,cat);
+  if(!qs.length){
+    showToast('📝','복습할 문제가 없어요','먼저 라운드를 풀어 오답을 만들어 보세요.');
+    if(mode==='review'){ renderHome(); showScreen('home'); }
+    return;
+  }
+  LAST={mode:mode,cat:cat||null};
+  G={
+    mode:mode, cat:cat||null, queue:qs, idx:0,
+    score:0, combo:0, maxCombo:0, hearts:3,
+    answered:0, correct:0, locked:false, roundWrong:[],
+    limit:(mode==='survival'?15:0), tEnd:0, raf:0, completed:false, reviewFixed:0
+  };
+  showScreen('quiz');
+  hideSheet();
+  renderQuestion();
+}
+
+function modeName(mode,cat){
+  if(mode==='daily') return '오늘의 도전';
+  if(mode==='survival') return '서바이벌 모드';
+  if(mode==='review') return '오답 복습';
+  return CATS[cat].name+' 집중';
+}
+function bestKey(mode,cat){ return mode==='category'?cat:mode; }
+
+function renderQuestion(){
+  const q=G.queue[G.idx];
+  const surv=G.mode==='survival';
+
+  $('q-index').textContent = G.mode==='survival' ? 'Q'+(G.idx+1) : 'Q'+(G.idx+1)+' / '+G.queue.length;
+  $('q-score').textContent=G.score;
+  $('q-text').textContent=q.q;
+  $('q-chip').className='chip '+CATS[q.cat].cls;
+  $('q-chip').textContent=CATS[q.cat].name+' · '+q.tag;
+
+  const hearts=$('q-hearts');
+  if(surv){
+    hearts.classList.remove('hidden');
+    hearts.innerHTML=Array.apply(null,Array(3)).map(function(_,i){
+      return '<span class="'+(i<G.hearts?'':'off')+'">'+(i<G.hearts?'❤':'♡')+'</span>';
+    }).join('');
+  }else{
+    hearts.classList.add('hidden');
+  }
+
+  const cb=$('q-combo');
+  cb.classList.toggle('on',G.combo>=2);
+  cb.innerHTML='🔥 '+G.combo;
+
+  const pf=$('q-progress');
+  if(surv){
+    pf.style.background='linear-gradient(90deg,#3fe0a2,#8ef0c0)';
+    pf.style.width='100%';
+  }else{
+    pf.style.background='';
+    pf.style.width=Math.round(G.idx/G.queue.length*100)+'%';
+  }
+
+  const box=$('q-choices');
+  if(q.type==='ox'){
+    box.className='ox-grid';
+    box.innerHTML=[0,1].map(function(i){
+      return '<button class="ox" data-v="'+q.choices[i]+'" data-i="'+i+'">'+q.choices[i]+'<small>'+(i===0?'맞아요':'아니에요')+'</small></button>';
+    }).join('');
+  }else{
+    box.className='choices';
+    box.innerHTML=q.choices.map(function(c,i){
+      return '<button class="choice" data-i="'+i+'"><span class="key">'+NUM[i]+'</span><span>'+esc(c)+'</span></button>';
+    }).join('');
+  }
+
+  G.locked=false;
+  scrollTop();
+  if(surv) startTimer(); else stopTimer();
+}
+
+function startTimer(){
+  stopTimer();
+  G.limit=15;
+  G.tEnd=performance.now()+G.limit*1000;
+  const track=$('timer-track');
+  track.classList.add('on');
+  tickTimer();
+}
+function stopTimer(){
+  if(G&&G.raf){ cancelAnimationFrame(G.raf); G.raf=0; }
+  $('timer-track').classList.remove('on');
+}
+function tickTimer(){
+  if(!G||G.locked) return;
+  const left=Math.max(0,G.tEnd-performance.now());
+  const f=left/(G.limit*1000);
+  const pf=$('q-progress');
+  pf.style.width=(f*100)+'%';
+  pf.style.background = f>0.5 ? 'linear-gradient(90deg,#3fe0a2,#8ef0c0)'
+    : f>0.25 ? 'linear-gradient(90deg,#ffcf5c,#ff9d4d)'
+    : 'linear-gradient(90deg,#ff6b81,#ff3d5a)';
+  if(left<=0){ answer(-1); return; }
+  G.raf=requestAnimationFrame(tickTimer);
+}
+
+function updateHearts(){
+  if(!G) return;
+  $('q-hearts').innerHTML=Array.apply(null,Array(3)).map(function(_,i){
+    return '<span class="'+(i<G.hearts?'':'off')+'">'+(i<G.hearts?'❤':'♡')+'</span>';
+  }).join('');
+}
+
+function answer(pick){
+  if(!G||G.locked) return;
+  G.locked=true;
+  if(G.raf){ cancelAnimationFrame(G.raf); G.raf=0; }
+  $('timer-track').classList.remove('on');
+
+  const q=G.queue[G.idx];
+  const surv=G.mode==='survival';
+  const timedOut=(pick===-1);
+  const ok=!timedOut&&pick===q.answer;
+
+  G.answered++;
+  let gain=0;
+  if(ok){
+    G.correct++;
+    G.combo++;
+    if(G.combo>G.maxCombo) G.maxCombo=G.combo;
+    const bonus=Math.min(G.combo-1,5)*20;
+    let speed=0;
+    if(surv){
+      const left=Math.max(0,G.tEnd-performance.now());
+      speed=Math.round(left/(G.limit*1000)*50);
+    }
+    gain=100+bonus+speed;
+    G.score+=gain;
+  }else{
+    G.combo=0;
+    if(surv) G.hearts--;
+  }
+
+  /* --- mark buttons --- */
+  const btns=Array.prototype.slice.call(document.querySelectorAll('#q-choices button'));
+  btns.forEach(function(b,i){
+    b.disabled=true;
+    if(i===q.answer) b.classList.add('correct');
+    else if(i===pick) b.classList.add('wrong');
+    else b.classList.add('dim');
+  });
+  if(!ok&&pick>=0&&btns[pick]) btns[pick].classList.add('wrong');
+
+  /* --- stats --- */
+  const d=DATA;
+  d.total.answered++;
+  if(ok) d.total.correct++;
+  const cs=d.catStats[q.cat];
+  cs.a++; if(ok) cs.c++;
+  d.seen[q.id]=true;
+  if(G.maxCombo>d.maxCombo) d.maxCombo=G.maxCombo;
+  if(ok){
+    if(d.wrong[q.id]) delete d.wrong[q.id];
+    if(G.mode==='review'){ d.reviewCorrect=(d.reviewCorrect||0)+1; G.reviewFixed++; }
+  }else{
+    const prev=d.wrong[q.id];
+    d.wrong[q.id]={n:(prev?prev.n:0)+1,pick:pick,at:Date.now()};
+    G.roundWrong.push(q.id);
+  }
+  save();
+
+  /* --- effects --- */
+  $('q-score').textContent=G.score;
+  updateHearts();
+  const cb=$('q-combo');
+  cb.classList.toggle('on',G.combo>=2);
+  cb.innerHTML='🔥 '+G.combo;
+  if(ok){
+    if(G.combo>=2){
+      cb.classList.remove('pop'); void cb.offsetWidth; cb.classList.add('pop');
+    }
+    floatScore('+'+gain+(G.combo>=3?'  🔥'+G.combo:''));
+    sfx(G.combo>=5?'combo':'ok');
+    buzz(14);
+  }else{
+    sfx('no');
+    buzz(timedOut?40:30);
+  }
+
+  checkAch(true);
+  showFeedback(q,pick,ok,timedOut,gain);
+}
+
+function floatScore(txt){
+  const el=document.createElement('div');
+  el.className='float-score';
+  el.textContent=txt;
+  document.getElementById('app').appendChild(el);
+  setTimeout(function(){ el.remove(); },1000);
+}
+
+function choiceText(q,i){
+  if(i===null||i===undefined||i<0) return '';
+  if(q.type==='ox') return q.choices[i];
+  return NUM[i]+' '+q.choices[i];
+}
+
+function showFeedback(q,pick,ok,timedOut,gain){
+  const surv=G.mode==='survival';
+  const last=G.idx>=G.queue.length-1;
+  const dead=surv&&G.hearts<=0;
+  const nextLabel=dead?'결과 보기':(last&&!surv?'결과 보기':'다음 문제');
+
+  let head,answerLine;
+  if(ok){
+    head='<div class="res-ico ok">✓</div><div class="tt">정답이에요!'+
+      (G.combo>=3?'<small>'+G.combo+'연속 · 콤보 보너스!</small>':'<small>좋아요, 감이 오는데요</small>')+
+      '</div><div class="pts">+'+gain+'</div>';
+    answerLine='';
+  }else{
+    head='<div class="res-ico no">✕</div><div class="tt">'+(timedOut?'시간 초과!':'아쉬워요')+
+      '<small>'+(surv&&G.hearts>0?'하트가 하나 줄었어요':'정답을 확인해 보세요')+'</small>'+
+      '</div><div class="pts">+0</div>';
+    answerLine='<div class="ex-answer">정답 <b>'+esc(choiceText(q,q.answer))+'</b>'+
+      (!timedOut&&pick>=0?' · 내가 고른 답 <s style="color:var(--no)">'+esc(choiceText(q,pick))+'</s>':'')+'</div>';
+  }
+
+  $('sheet-body').innerHTML=
+    head+
+    '<div class="sheet-body">'+
+      answerLine+
+      '<span class="ex-label">한 입 해설</span>'+
+      '<div class="ex-text">'+esc(q.ex)+'</div>'+
+    '</div>'+
+    '<button class="btn-next" data-act="next">'+nextLabel+'</button>';
+
+  const sheet=$('sheet');
+  sheet.classList.add('show');
+}
+
+function hideSheet(){ $('sheet').classList.remove('show'); }
+
+function nextQuestion(){
+  if(!G||!G.locked) return;
+  hideSheet();
+  const surv=G.mode==='survival';
+  const last=G.idx>=G.queue.length-1;
+
+  if(surv){
+    if(G.hearts<=0){ finish(true); return; }
+    if(last){ G.queue=G.queue.concat(shuffle(QUESTIONS)); }
+    G.idx++;
+    renderQuestion();
+    return;
+  }
+  if(last){ finish(true); return; }
+  G.idx++;
+  renderQuestion();
+}
+
+/* ---------- finish ---------- */
+function finish(completed){
+  if(!G) return;
+  stopTimer();
+  hideSheet();
+  const g=G,d=DATA;
+  const mode=g.mode, cat=g.cat;
+  const key=bestKey(mode,cat);
+  const answered=g.answered, correct=g.correct;
+  const acc=answered?Math.round(correct/answered*100):0;
+  const prevBest=d.best[key]||0;
+  const isRecord=answered>0&&g.score>prevBest;
+  g.prevBest=prevBest;
+
+  if(g.score>prevBest) d.best[key]=g.score;
+
+  if(answered>0){
+    d.rounds++;
+    const t=todayKey();
+    if(d.streak.last!==t){
+      d.streak.count=(d.streak.last===yesterdayKey())?d.streak.count+1:1;
+      d.streak.last=t;
+      if(d.streak.count>d.streak.best) d.streak.best=d.streak.count;
+    }
+  }
+  if(answered>=10&&correct===answered){
+    d.perfectRounds++;
+    if(mode==='category'&&d.catPerfect[cat]!==undefined) d.catPerfect[cat]=true;
+  }
+  if(mode==='survival'&&answered>d.survBest) d.survBest=answered;
+  if(mode==='daily'&&answered>=g.queue.length){
+    d.dailyDate=todayKey();
+    if(g.score>(d.dailyScore||0)) d.dailyScore=g.score;
+  }
+  save();
+
+  const newAch=checkAch(false);
+  if(!d.title){
+    const firstTitle=ACHS.find(function(a){return !!a.title&&d.ach[a.id];});
+    if(firstTitle){ d.title=firstTitle.title; save(); }
+  }
+  g.completed=!!completed;
+
+  const perfect=(answered>=10&&correct===answered);
+  renderResult(isRecord,newAch,acc,perfect);
+  showScreen('result');
+  if(isRecord||perfect) confetti();
+  sfx('end');
+}
+
+function confetti(){
+  const box=$('confetti');
+  const colors=['#ffce5c','#ff9d5c','#5cc8ff','#b78dff','#3fe0a2','#ff6b81'];
+  let html='';
+  for(let i=0;i<46;i++){
+    const left=Math.random()*100;
+    const delay=Math.random()*0.5;
+    const dur=1.6+Math.random()*1.4;
+    const size=5+Math.random()*7;
+    const col=colors[Math.floor(Math.random()*colors.length)];
+    html+='<i style="left:'+left+'%;top:0;width:'+size+'px;height:'+(size*0.6)+'px;background:'+col+
+      ';animation-delay:'+delay+'s;animation-duration:'+dur+'s;transform:rotate('+Math.random()*180+'deg)"></i>';
+  }
+  box.innerHTML=html;
+  setTimeout(function(){ box.innerHTML=''; },3200);
+}
+
+function renderResult(isRecord,newAch,acc,perfect){
+  const g=G,d=DATA;
+  const surv=g.mode==='survival';
+  const title = !g.completed ? '중단한 라운드' : (surv?'서바이벌 종료':'라운드 완료');
+  const sub = modeName(g.mode,g.cat)+' · '+g.answered+'문제';
+
+  const unlockHtml = newAch.length ?
+    '<div class="unlocked"><div class="h">NEW 칭호 · 업적</div>'+
+      newAch.map(function(a){
+        return '<div class="a"><span class="i">'+a.icon+'</span><span>'+esc(a.name)+
+          (a.title?' <span style="color:var(--dim);font-weight:600">· '+esc(a.title)+'</span>':'')+'</span></div>';
+      }).join('')+
+    '</div>' : '';
+
+  const wrongN=g.roundWrong.length;
+  let note;
+  if(!g.answered) note='다음엔 한 문제라도 풀어봐요!';
+  else if(perfect) note='전부 맞혔어요. 이 정도면 오늘의 역사왕!';
+  else if(wrongN) note='틀린 '+wrongN+'문제는 도감 > 오답 노트에 저장했어요.';
+  else note='좋아요. 다음 라운드도 가볼까요?';
+
+  $('result-body').innerHTML=
+    '<div class="res-wrap">'+
+      '<div class="res-kicker">'+esc(title).toUpperCase()+'</div>'+
+      '<div class="res-score" id="res-score">0<small>점</small></div>'+
+      '<div class="res-mode">'+esc(sub)+'</div>'+
+      (isRecord?'<div class="record">🏅 '+(g.prevBest>0?'신기록! 이전 최고 '+g.prevBest+'점':'첫 기록 등록!')+'</div>':'')+
+      (perfect?'<div class="record">✨ 올 클리어</div>':'')+
+      '<div class="res-grid">'+
+        '<div class="res-cell"><b class="'+(g.correct===g.answered&&g.answered?'ok':'')+'">'+g.correct+'/'+g.answered+'</b><span>정답</span></div>'+
+        '<div class="res-cell"><b>'+acc+'%</b><span>정답률</span></div>'+
+        '<div class="res-cell"><b>'+g.maxCombo+'</b><span>최고 콤보</span></div>'+
+      '</div>'+
+      unlockHtml+
+      '<div class="res-note">'+esc(note)+'</div>'+
+      '<div class="res-actions">'+
+        '<button class="btn-primary" data-act="again">다시 도전</button>'+
+        '<button class="btn-ghost" data-act="go-home">홈으로</button>'+
+      '</div>'+
+      '<div style="height:20px"></div>'+
+    '</div>';
+
+  /* score count-up */
+  const el=$('res-score');
+  const target=g.score;
+  const t0=performance.now();
+  const dur=700;
+  function step(t){
+    const p=Math.min(1,(t-t0)/dur);
+    const e=1-Math.pow(1-p,3);
+    el.innerHTML=Math.round(target*e)+'<small>점</small>';
+    if(p<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+  setTimeout(function(){ el.innerHTML=target+'<small>점</small>'; },dur+120);
+}
+
+/* ---------- collection ---------- */
+function renderCollection(){
+  document.querySelectorAll('#seg button').forEach(function(b){
+    b.classList.toggle('on',b.dataset.seg===SEG);
+  });
+  if(SEG==='wrong') renderWrong();
+  else if(SEG==='titles') renderTitles();
+  else renderStats();
+}
+
+function wrongIds(){
+  return Object.keys(DATA.wrong).sort(function(a,b){return (DATA.wrong[b].at||0)-(DATA.wrong[a].at||0);});
+}
+function qById(id){ return QUESTIONS.find(function(q){return q.id===id;}); }
+
+function renderWrong(){
+  const ids=wrongIds();
+  if(!ids.length){
+    $('collection-body').innerHTML=
+      '<div class="empty"><span class="i">🎉</span><b>오답 노트가 비어 있어요</b>'+
+      '<span>라운드를 풀면 틀린 문제가 여기에 쌓여요.<br>다시 풀어서 하나씩 지워보세요.</span></div>';
+    return;
+  }
+  const list=ids.slice(0,60).map(function(id){
+    const q=qById(id); if(!q) return '';
+    const w=DATA.wrong[id]||{n:1};
+    const myPick=(w.pick!==null&&w.pick!==undefined&&w.pick>=0)?choiceText(q,w.pick):'시간 초과';
+    return '<div class="wrong-item">'+
+      '<div class="top"><span class="cat '+CATS[q.cat].cls+'">'+CATS[q.cat].name+'</span>'+
+        '<span style="font-size:10.5px;color:var(--dim2);font-weight:700">'+esc(q.tag)+'</span>'+
+        '<span class="cnt">'+w.n+'번 틀림</span></div>'+
+      '<div class="q">'+esc(q.q)+'</div>'+
+      '<div class="ans">내 답 <s>'+esc(myPick)+'</s> · 정답 <b>'+esc(choiceText(q,q.answer))+'</b></div>'+
+      '<div class="ex">'+esc(q.ex)+'</div>'+
+    '</div>';
+  }).join('');
+
+  $('collection-body').innerHTML=
+    '<div class="wrong-head">'+
+      '<span class="n">틀린 문제 '+ids.length+'개</span>'+
+      '<button class="btn-ghost" data-act="start" data-mode="review">오답 복습 시작</button>'+
+    '</div>'+
+    list+
+    (ids.length>60?'<p style="text-align:center;color:var(--dim2);font-size:11.5px;margin:10px 0">최근 60개만 보여요</p>':'');
+}
+
+function renderTitles(){
+  const owned=ACHS.filter(function(a){return a.title&&DATA.ach[a.id];});
+  const locked=ACHS.filter(function(a){return a.title&&!DATA.ach[a.id];});
+  let html='';
+
+  if(!owned.length){
+    html+='<div class="empty" style="padding:26px 16px 30px"><span class="i">🎖️</span><b>아직 칭호가 없어요</b>'+
+      '<span>라운드를 완료하면 첫 칭호를 받아요.</span></div>';
+  }else{
+    html+='<div class="title-grid" style="margin-bottom:18px">'+owned.map(function(a){
+      const on=DATA.title===a.title;
+      return '<button class="title-card'+(on?' on':'')+'" data-act="equip" data-title="'+esc(a.title)+'">'+
+        '<span class="i">'+a.icon+'</span><b>'+esc(a.title)+'</b><span>'+esc(a.desc)+'</span>'+
+        '<span class="use">'+(on?'✔ 사용 중':'눌러서 착용')+'</span></button>';
+    }).join('')+'</div>';
+  }
+
+  html+='<div class="section-label" style="margin:4px 2px 11px"><h2>업적 '+
+        (Object.keys(DATA.ach).length)+' / '+ACHS.length+'</h2></div>';
+
+  html+=ACHS.map(function(a){
+    const got=!!DATA.ach[a.id];
+    return '<div class="ach '+(got?'on':'locked')+'">'+
+      '<span class="i">'+(got?a.icon:'🔒')+'</span>'+
+      '<span class="b"><b>'+esc(a.name)+'</b><span>'+esc(a.desc)+'</span></span>'+
+      (got?'<span class="ck">✓</span>':'')+
+    '</div>';
+  }).join('');
+
+  if(locked.length){
+    html+='<p style="color:var(--dim2);font-size:11.5px;margin:12px 2px;line-height:1.6">남은 칭호 '+locked.length+'개 · 업적을 달성하면 자동으로 열려요.</p>';
+  }
+  $('collection-body').innerHTML=html;
+}
+
+function renderStats(){
+  const d=DATA;
+  const acc=d.total.answered?Math.round(d.total.correct/d.total.answered*100):0;
+  let bars='';
+  ['korean','world','general'].forEach(function(k){
+    const st=d.catStats[k];
+    const r=st.a?Math.round(st.c/st.a*100):0;
+    bars+='<div class="stat-line '+CATS[k].cls+'">'+
+      '<div class="r"><span>'+CATS[k].icon+' '+CATS[k].name+'</span><b>'+r+'% <span style="font-weight:600;color:var(--dim2)">('+st.c+'/'+st.a+')</span></b></div>'+
+      '<div class="track"><div class="fill" style="width:'+r+'%"></div></div></div>';
+  });
+
+  $('collection-body').innerHTML=
+    '<div class="stat-cards">'+
+      '<div class="sc"><b>'+d.total.answered+'</b><span>누적 푼 문제</span></div>'+
+      '<div class="sc"><b>'+acc+'%</b><span>누적 정답률</span></div>'+
+      '<div class="sc"><b>'+d.maxCombo+'</b><span>최고 콤보</span></div>'+
+      '<div class="sc"><b>'+d.streak.best+'일</b><span>최장 연속 출석</span></div>'+
+    '</div>'+
+    '<div class="section-label" style="margin-top:0"><h2>카테고리 정답률</h2></div>'+
+    bars+
+    '<div class="section-label"><h2>최고 점수</h2></div>'+
+    '<div class="stat-cards" style="grid-template-columns:1fr 1fr;margin-bottom:0">'+
+      '<div class="sc"><b>'+d.best.daily+'</b><span>오늘의 도전</span></div>'+
+      '<div class="sc"><b>'+d.best.survival+'</b><span>서바이벌</span></div>'+
+      '<div class="sc"><b>'+d.best.korean+'</b><span>한국사</span></div>'+
+      '<div class="sc"><b>'+d.best.world+'</b><span>세계사</span></div>'+
+      '<div class="sc"><b>'+d.best.general+'</b><span>교양 상식</span></div>'+
+      '<div class="sc"><b>'+d.best.review+'</b><span>오답 복습</span></div>'+
+    '</div>'+
+    '<div class="section-label"><h2>탐구 기록</h2></div>'+
+    '<div class="stat-cards">'+
+      '<div class="sc"><b>'+d.rounds+'</b><span>완료한 라운드</span></div>'+
+      '<div class="sc"><b>'+d.perfectRounds+'</b><span>만점 라운드</span></div>'+
+      '<div class="sc"><b>'+d.survBest+'</b><span>서바이벌 최고 생존</span></div>'+
+      '<div class="sc"><b>'+Object.keys(d.wrong).length+'</b><span>남은 오답</span></div>'+
+    '</div>'+
+    '<div style="height:10px"></div>';
+}
+
+/* ---------- settings ---------- */
+function renderSettings(){
+  const s=DATA.sound, v=DATA.vibrate;
+  $('settings-body').innerHTML=
+    '<div class="set-row"><div class="t"><b>효과음</b><span>정답·오답·콤보 소리를 켜고 꺼요</span></div>'+
+      '<button class="sw '+(s?'on':'')+'" data-act="toggle-sound" aria-label="효과음"></button></div>'+
+    '<div class="set-row"><div class="t"><b>진동</b><span>답을 고를 때 짧게 진동해요 (안드로이드)</span></div>'+
+      '<button class="sw '+(v?'on':'')+'" data-act="toggle-vibrate" aria-label="진동"></button></div>'+
+    '<div class="set-row"><div class="t"><b>문제 수</b><span>한국사 24 · 세계사 24 · 교양 24 · 총 72문제</span></div></div>'+
+    '<div class="set-row"><div class="t"><b>저장 방식</b><span>기록은 이 브라우저에만 저장돼요 (localStorage)</span></div></div>'+
+    '<button class="danger" data-act="reset">모든 기록 지우기</button>'+
+    '<div class="about"><b>역사 한 입</b> · 한국사·세계사·교양 상식을 한 입씩 먹는 퀴즈.<br>'+
+      '틀린 문제는 오답 노트에 쌓이고, 맞히면 지워져요. 매일 자정에 오늘의 도전이 새로 열립니다.<br><br>'+
+      '정우 님을 위해 만든 개인용 게임이에요. 🍽️</div>'+
+    '<div style="height:16px"></div>';
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click',function(e){
+  const tab=e.target.closest('[data-tab]');
+  if(tab){
+    sfx('tap');
+    if(tab.dataset.tab==='home'){ renderHome(); showScreen('home'); }
+    else if(tab.dataset.tab==='collection'){ renderCollection(); showScreen('collection'); }
+    else { renderSettings(); showScreen('settings'); }
+    return;
+  }
+
+  const el=e.target.closest('[data-act]');
+  if(!el) return;
+  const act=el.dataset.act;
+
+  if(act==='start'){
+    sfx('tap');
+    start(el.dataset.mode,el.dataset.cat);
+  }
+  else if(act==='next'){ nextQuestion(); }
+  else if(act==='again'){ start(LAST.mode,LAST.cat); }
+  else if(act==='go-home'){ G=null; renderHome(); showScreen('home'); }
+  else if(act==='toggle-sound'){
+    DATA.sound=!DATA.sound; save(); renderSettings();
+    if(DATA.sound) sfx('tap');
+  }
+  else if(act==='toggle-vibrate'){
+    DATA.vibrate=!DATA.vibrate; save(); renderSettings(); buzz(20);
+  }
+  else if(act==='reset'){
+    confirmModal({
+      title:'모든 기록을 지울까요?',
+      desc:'최고 점수, 오답 노트, 칭호가 모두 사라져요. 되돌릴 수 없습니다.',
+      ok:'지우기', cancel:'취소', danger:true
+    }).then(function(yes){
+      if(!yes) return;
+      DATA=JSON.parse(JSON.stringify(DEFAULT));
+      save();
+      G=null;
+      renderHome(); renderSettings(); showScreen('settings');
+      showToast('🗑️','기록을 지웠어요','처음부터 다시 시작해요.');
+    });
+  }
+  else if(act==='equip'){
+    DATA.title=el.dataset.title; save();
+    renderTitles();
+    showToast('🎖️','칭호를 착용했어요',DATA.title);
+  }
+});
+
+$('q-choices').addEventListener('click',function(e){
+  const b=e.target.closest('button'); if(!b) return;
+  answer(Number(b.dataset.i));
+});
+
+$('seg').addEventListener('click',function(e){
+  const b=e.target.closest('[data-seg]'); if(!b) return;
+  SEG=b.dataset.seg;
+  sfx('tap');
+  renderCollection();
+});
+
+$('btn-quit').addEventListener('click',function(){
+  if(!G) return;
+  confirmModal({
+    title:'그만둘까요?',
+    desc:'지금까지 푼 문제의 점수로 라운드가 끝나요. 오답은 노트에 남습니다.',
+    ok:'그만두기', cancel:'계속하기'
+  }).then(function(yes){
+    if(yes) finish(false);
+  });
+});
+
+$('btn-sound-home').addEventListener('click',function(){
+  DATA.sound=!DATA.sound; save();
+  this.textContent=DATA.sound?'🔊':'🔇';
+  if(DATA.sound) sfx('tap');
+  if(SCREEN==='settings') renderSettings();
+});
+
+document.addEventListener('keydown',function(e){
+  if(SCREEN!=='quiz'||!G) return;
+  if(G.locked){
+    if(e.key==='Enter'||e.key===' '){ e.preventDefault(); nextQuestion(); }
+    return;
+  }
+  if(e.key==='Enter'||e.key===' '){
+    e.preventDefault();
+    const n=document.querySelectorAll('#q-choices button').length;
+    if(n===2) answer(0);
+    return;
+  }
+  const n=Number(e.key);
+  const total=document.querySelectorAll('#q-choices button').length;
+  if(n>=1&&n<=total){ e.preventDefault(); answer(n-1); }
+});
+
+/* ---------- boot ---------- */
+function boot(){
+  const sb=$('btn-sound-home');
+  if(sb) sb.textContent=DATA.sound?'🔊':'🔇';
+  renderHome();
+  renderSettings();
+  showScreen('home');
+}
+document.addEventListener('DOMContentLoaded',boot);
+if(document.readyState!=='loading') boot();
+
+window.__HB = { DATA:function(){return DATA;}, QUESTIONS:QUESTIONS, ACHS:ACHS };
+
+})();
+
+</script>
+</body>
+</html>
